@@ -51,14 +51,13 @@ def _exec_internal(debug_mode=False):
 # Handles execution on the remote main node, before booting the cluster
 def exec(time, exec_time=None, debug_mode=False):
     print('Connected!')
-    print('GIVEN TIME: '+time)
     cluster_cfg = clr.get_cluster_config()
 
     time_to_reserve = exec_time if exec_time != None else ui.ask_time('''
 How much time to reserve for Spark cluster with {} nodes?
-Note: Prefer reserving more time over a closing cluster
-in the middle of your experiment.
-''')
+Note: Prefer reserving more time over the reservation system
+closing the cluster in the middle of your experiment.
+'''.format(cluster_cfg.nodes))
 
 
     fs.rm(loc.get_cfg_dir(), '.metaspark.cfg', ignore_errors=True)
@@ -116,6 +115,15 @@ def export(full_exp=False):
         printe('Export failure!')
         return False    
 
+def _init_internal():
+    if (not jv.check_version()):
+        print('Java not ready on remote!')
+        exit(1)
+    elif not spk.install():
+        exit(1)
+    else:
+        exit(0)
+
 
 # Handles init commandline argument
 def init():
@@ -123,7 +131,11 @@ def init():
     if not export(full_exp=True):
         printe('Unable to export to DAS5 remote using user/ssh-key "{}"'.format(metacfg.ssh_key_name))
         return False
-    prints('Completed MetaSpark initialization. Use "{} --remote" to start execution on the remote host'.format(sys.argv[0]))
+    if os.system('ssh {} "python3 {}/main.py --init_internal"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir())) == 0:
+        prints('Completed MetaSpark initialization. Use "{} --remote" to start execution on the remote host'.format(sys.argv[0]))
+    else:
+        printe('Something went wrong with MetaSpark initialization (see above). Please fix the problems and try again!')
+
 
 # Handles remote commandline argument
 def remote(time, force_exp=False, debug_mode=False):
@@ -154,10 +166,11 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--check', help='check whether environment has correct tools', action='store_true')
     group.add_argument('--exec_internal', help=argparse.SUPPRESS, action='store_true')
-    group.add_argument('--exec', nargs='?', metavar='[[hh:]mm:]ss', help='call this on the DAS5 to handle server orchestration')
+    group.add_argument('--exec', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', type=str, help='call this on the DAS5 to handle server orchestration')
     group.add_argument('--export', help='export only metaspark and script code to the DAS5', action='store_true')
+    group.add_argument('--init_internal', help=argparse.SUPPRESS, action='store_true')
     group.add_argument('--init', help='Initialize MetaSpark to run code on the DAS5', action='store_true')
-    group.add_argument('--remote', nargs='?', metavar='[[hh:]mm:]ss', help='execute code on the DAS5 from your local machine')
+    group.add_argument('--remote', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', type=str, help='execute code on the DAS5 from your local machine')
     group.add_argument('--settings', help='Change settings', action='store_true')
     parser.add_argument('-c', '--force-compile', dest='force_comp', help='Forces to (re)compile Zookeeper, even when build seems OK', action='store_true')
     parser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
@@ -171,9 +184,11 @@ def main():
     elif args.exec_internal:
         _exec_internal(args.debug_mode)
     elif args.exec:
-        exec(args.exec[0], debug_mode=args.debug_mode)
+        exec(args.exec, debug_mode=args.debug_mode)
     elif args.export:
         export(full_exp=True)
+    elif args.init_internal:
+        _init_internal()
     elif args.init:
         init()
     elif args.remote:

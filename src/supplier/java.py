@@ -17,39 +17,48 @@ def check_can_call(arglist):
     return True
 
 # Tries to get Java version from commandline
-def _get_java_version(location='java'):
+def _get_shell_java_version(location='java'):
     check_can_call([location, '-version'])
     java_version = subprocess.check_output(location+' -version 2>&1 | awk -F[\\\"_] \'NR==1{print $2}\'', shell=True).decode('utf-8').split('.')
     return int(java_version[1])
 
 # Tries to get Javac version from commandline
-def _get_javac_version(location='javac'):
+def _get_shell_javac_version(location='javac'):
     check_can_call([location, '-version'])
     javac_version = subprocess.check_output(location+' -version 2>&1 | awk -F\' \' \'{print $2}\'', shell=True).decode('utf-8').split('.')
     tmp = int(javac_version[1])
     return tmp if tmp > 1 else int(javac_version[1])
 
-# Takes a path like /path/to/java-11-openjdk-11.0.3.../, returns Java major version
+# Takes a path like /path/to/java-11-openjdk-11.0.3.../
+# Returns Java major version if it follows standard pattern, otherwise 0
 def _dirname_to_version(dirname):
-    d = dirname.split(fs.sep())[-1] if fs.sep() in dirname else dirname
-    v = d.split('-')[1]
-    if '.' in v: # Version like 1.8.0
-        return int(v.split('.')[1])
-    else: # Version like 11
-        return int(v)
+    try:
+        d = dirname.split(fs.sep())[-1] if fs.sep() in dirname else dirname
+        v = d.split('-')[1]
+        if '.' in v: # Version like 1.8.0
+            return int(v.split('.')[1])
+        else: # Version like 11
+            return int(v)
+    except Exception as e:
+        return 0
+
+# Gets shell-java's installation path.
+# Note: May point to JRE instead of JDK!
+def _get_shell_java_path():
+    java_bin = subprocess.check_output('which java', shell=True).decode('utf-8').strip()
+    if fs.issymlink(java_bin):
+        java_bin = fs.resolvelink(java_bin)
+    return java_bin
 
 # Checks if the default 'java' command is valid java
 # Returns full path to executable if we can use it, None otherwise
-def _resolve_path_JAVA(minVersion, maxVersion):
-    java_version = _get_java_version()
-    java_bin = subprocess.check_output('which java', shell=True).decode('utf-8').strip()
+def _resolve1(minVersion, maxVersion):
+    java_version = _get_shell_java_version()
 
     if java_version >= minVersion and java_version <= maxVersion:
-        if fs.issymlink(java_bin):
-            java_bin = fs.resolvelink(java_bin)
+        java_bin = _get_shell_java_path()
         if fs.dirname(fs.dirname(java_bin)).endswith('jre'): # JRE path found, jdk is commonly right above that path 
             java_bin = fs.join(fs.dirname(fs.dirname(fs.dirname(java_bin))), 'bin')
-
         if not 'javac' in fs.ls(java_bin, only_files=True):
             printw('Could not find valid JAVA_HOME using standard java.')
             return None
@@ -62,15 +71,14 @@ scanning for directories containing the right names.
 
 Yields found paths lazily
 '''
-def resolve_JAVA_HOME(path, minVersion, maxVersion):
+def resolve2(minVersion, maxVersion, path=_get_shell_java_path()):
     p = str(path)
     dirlen = len(p.split(fs.sep()))
-    for x in range(dirlen):
-        p = fs.sep().join(p.split(fs.sep())[:-1])
-        for item in fs.ls(only_dirs=True, full_paths=True):
+    for x in range(dirlen-1):
+        p = fs.dirname(p)
+        for item in fs.ls(p, only_dirs=True, full_paths=True):
             if fs.basename(item).startswith('java-') or 'openjdk' in fs.basename(item): #candidate found
-                print('Evaluating candidate: '+item)
-                version = _dirname_to_version(item)
+                version = _dirname_to_version(fs.basename(item))
                 if version < minVersion or java_version > maxVersion:
                     continue
                 if (not fs.isdir(item, 'bin')) or (not fs.isfile(item, 'bin', 'java')) or not fs.isfile(item, 'bin', 'javac'):
@@ -92,26 +100,25 @@ def check_version(minVersion=11, maxVersion=11):
     returncode = True
     if not 'JAVA_HOME' in os.environ:
         printw('JAVA_HOME is not set. Detecting automatically...')
-        path = _resolve_path_JAVA(minVersion, maxVersion)
+        path = _resolve1(minVersion, maxVersion)
         exported = False
         if path != None:
             if _write_bashrc('export JAVA_HOME={}\n'.format(path), question='Export found location "{}" to your .bashrc?'.format(path)):
                 exported = True
         if not exported:
-            checkpath = subprocess.check_output('which java', shell=True).decode('utf-8').strip()
-            for path in resolve_JAVA_HOME(checkpath, minVersion, maxVersion):
+            for path in resolve2(minVersion, maxVersion):
                 print('Valid JAVA_HOME target found: {}'.format(path))
                 if _write_bashrc('export JAVA_HOME={}\n'.format(path), question='Export found location "{}" to your .bashrc?'.format(path)):
                     exported = True
                     break
         if not exported:
-            printe('Unable to detect JAVA_HOME. Set JAVA_HOME yourself.')
+            printe('Unable to detect valid JAVA_HOME. Set JAVA_HOME yourself.')
             print('Note: Java is commonly installed in /usr/lib/jvm/...')
-            returncode = False
+            return False
     elif not fs.isfile(os.environ['JAVA_HOME'], 'bin', 'java'):
         printe('Incorrect JAVA_HOME set: Cannot reach JAVA_HOME/bin/java ({0}/bin/java'.format(os.environ['JAVA_HOME']))
         print('Note: Java is commonly installed in /usr/lib/jvm/...')
-        returncode = False
+        return False
     
     java_version_number = _get_java_version(fs.join(os.environ['JAVA_HOME'], 'bin', 'java'))
     if java_version_number > maxVersion:
@@ -122,7 +129,7 @@ def check_version(minVersion=11, maxVersion=11):
         returncode = False
 
     
-    javac_version_number = _get_javac_version(fs.join(os.environ['JAVA_HOME'], 'bin', 'javac'))
+    javac_version_number = _get_shell_javac_version(fs.join(os.environ['JAVA_HOME'], 'bin', 'javac'))
     if javac_version_number > maxVersion:
         printe('Your Javac version is too new. Please install Java version [{0}-{1}]. If you believe you have such version, use set_javac.sh.'.format(minVersion, maxVersion))
         returncode = False
