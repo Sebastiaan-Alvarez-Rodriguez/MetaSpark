@@ -82,7 +82,6 @@ def exec(time_to_reserve, config_filename, debug_mode):
     #     print(e)
     #     status = executor.stop() == 0
 
-    # TODO: Cleanup whatever is needed?
 
     if status:
         printc('Cluster execution complete!', Color.PRP)
