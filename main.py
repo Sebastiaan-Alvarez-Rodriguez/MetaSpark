@@ -12,6 +12,7 @@ sys.path.append(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'src
 from config.meta import cfg_meta_instance as metacfg
 import config.cluster as clr
 import remote.remote as rmt
+from remote.reservation import Reserver
 import supplier.spark as spk
 import supplier.java as jv
 from util.executor import Executor
@@ -62,11 +63,14 @@ def exec(time_to_reserve, config_filename, debug_mode):
     # Build commands to boot the cluster
     affinity = cluster_cfg.coallocation_affinity
     nodes = cluster_cfg.nodes
-    command = 'prun -np {} -{} -t {} python3 {} --exec_internal {} {}'.format(nodes, affinity, time_to_reserve, fs.join(fs.abspath(), 'main.py'), config_filename, '-d' if debug_mode else '')
-
+    # 'echo $RESERVATION > reservation_no'
+    # preserve -1  -np $NODES -t 2:00:00  | grep "Reservation number" | awk '{ print $3 }' | sed 's/://'`
+    # 'prun -np {} -{} -t {} python3 {} --exec_internal {} {}'.format(nodes, affinity, time_to_reserve, fs.join(fs.abspath(), 'main.py'), config_filename, '-d' if debug_mode else '')
+    
+    reserver = Reserver()
+    reserver.reserve(nodes, affinity, time_to_reserve)
+    
     print('Booting network...')
-    executor = Executor(command, shell=True)
-
     # Remove old logs
     fs.rm(loc.get_spark_logs_dir(), ignore_errors=True)
 
@@ -81,7 +85,6 @@ def exec(time_to_reserve, config_filename, debug_mode):
     #     printw('Unexpected error found (cleaning up):')
     #     print(e)
     #     status = executor.stop() == 0
-
 
     if status:
         printc('Cluster execution complete!', Color.PRP)
