@@ -12,7 +12,6 @@ sys.path.append(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'src
 from config.meta import cfg_meta_instance as metacfg
 import config.cluster as clr
 import remote.remote as rmt
-import result.results as res
 import supplier.spark as spk
 import supplier.java as jv
 from util.executor import Executor
@@ -45,75 +44,80 @@ def clean():
     return True
 
 # Redirects server node control to dedicated code
-def _exec_internal(debug_mode=False):
-    return rmt.run(debug_mode)
+def _exec_internal(config_filename, debug_mode):
+    return rmt.run(config_filename, debug_mode)
 
 # Handles execution on the remote main node, before booting the cluster
-def exec(time, exec_time=None, debug_mode=False):
-    print('Connected!')
-    cluster_cfg = clr.get_cluster_config()
+def exec(time_to_reserve, config_filename, debug_mode):
+    print('Connected! Using cluster configuration "{}"'.format(config_filename))
+    cluster_cfg = clr.load_cluster_config(config_filename)
 
-    time_to_reserve = exec_time if exec_time != None else ui.ask_time('''
-How much time to reserve for Spark cluster with {} nodes?
-Note: Prefer reserving more time over the reservation system
-closing the cluster in the middle of your experiment.
-'''.format(cluster_cfg.nodes))
+#     time_to_reserve = time if time != '' else ui.ask_time('''
+# How much time to reserve for Spark cluster with {} nodes?
+# Note: Prefer reserving more time over the reservation system
+# closing the cluster in the middle of your experiment.
+# '''.format(cluster_cfg.nodes))
+    print('Booting cluster ({} nodes) for time: {}'.format(cluster_cfg.nodes, time_to_reserve))
 
+    # Build commands to boot the cluster
+    affinity = cluster_cfg.coallocation_affinity
+    nodes = cluster_cfg.nodes
+    command = 'prun -np {} -{} -t {} python3 {} --exec_internal {} {}'.format(nodes, affinity, time_to_reserve, fs.join(fs.abspath(), 'main.py'), config_filename, '-d' if debug_mode else '')
 
-    fs.rm(loc.get_cfg_dir(), '.metaspark.cfg', ignore_errors=True)
-    fs.rm(loc.get_metaspark_experiment_dir(), '.port.txt', ignore_errors=True)
-        
-    # Build commands to boot the experiment
-    affinity = config.coallocation_affinity
-    nodes = config.nodes
-    command = 'prun -np {} -{} -t {} python3 {} --exec_internal {}'.format(nodes, affinity, time_to_reserve, fs.join(fs.abspath(), 'main.py'), '-d' if debug_mode else '')
-    
     print('Booting network...')
-    executor = Executor(command)
+    executor = Executor(command, shell=True)
 
-    executor.run(shell=True)
-    status = executor.wait() == 0
+    # Remove old logs
+    fs.rm(loc.get_spark_logs_dir(), ignore_errors=True)
 
-    # TODO: Cleanup
+    try:
+        executor.run()
+        status = executor.wait() == 0
+    except KeyboardInterrupt as e:
+        print('Keyboardinterrupt received, stopping cluster for you!')
+        executor.stop()
+        status = True
+    # except Exception as e:
+    #     printw('Unexpected error found (cleaning up):')
+    #     print(e)
+    #     status = executor.stop() == 0
+
+    # TODO: Cleanup whatever is needed?
 
     if status:
-        printc('Experiment {}/{} complete!'.format(idx+1, len(experiments)), Color.PRP)
+        printc('Cluster execution complete!', Color.PRP)
     else:
-        printe('Experiment {}/{} had errors!'.format(idx+1, len(experiments)))
+        printe('Cluster execution shutdown with errors!')
     return status
 
 # Handles export commandline argument
 def export(full_exp=False):
     print('Copying files using "{}" strategy, using key "{}"...'.format('full' if full_exp else 'fast', metacfg.ssh.ssh_key_name))
+    command = 'rsync -az {} {}:{}'.format(fs.abspath(),metacfg.ssh.ssh_key_name,loc.get_remote_metaspark_parent_dir())
     if full_exp:
-        command = 'rsync -az {} {}:{} {} {} {} {}'.format(
-            fs.abspath(),
-            metacfg.ssh.ssh_key_name,
-            loc.get_remote_metaspark_parent_dir(),
-            '--exclude .git',
-            '--exclude __pycache__',
-            '--exclude results', 
-            '--exclude graphs')
+        command+= ' --exclude '+' --exclude '.join([
+            '.git',
+            '__pycache__',
+            'results', 
+            'graphs'])
         if not clean():
             printe('Cleaning failed')
             return False
     else:
         print('[NOTE] This means we skip dep files.')
-        command = 'rsync -az {} {}:{} {} {} {} {} {}'.format(
-            fs.dirname(fs.abspath()),
-            metacfg.ssh.ssh_key_name,
-            loc.get_remote_parent_dir(),
-            '--exclude .git',
-            '--exclude __pycache__',
-            '--exclude results',
-            '--exclude graphs',
-            '--exclude deps')
+        command+= ' --exclude '+' --exclude '.join([
+            '.git',
+            '__pycache__',
+            'results', 
+            'graphs',
+            'deps'])
     if os.system(command) == 0:
         prints('Export success!')
         return True
     else:
         printe('Export failure!')
         return False    
+
 
 def _init_internal():
     if (not jv.check_version()):
@@ -138,12 +142,22 @@ def init():
 
 
 # Handles remote commandline argument
-def remote(time, force_exp=False, debug_mode=False):
+def remote(time_to_reserve, config_filename, debug_mode, force_exp):
     if force_exp and not export(full_exp=True):
         printe('Could not export data')
         return False
 
-    program = '--exec {}'.format(time) + (' -d' if debug_mode else '')
+    if len(config_filename) == 0: #user did not provide config, so ask for it
+        config, should_export = clr.get_cluster_config()
+        config_filename = fs.basename(config.path)
+        if should_export:
+            export(full_exp=False) #Export potential new config
+    else:
+        if not fs.isfile(loc.get_metaspark_cluster_conf_dir(), config_filename):
+            printe('Provided config "{}" does not exist!'.format(fs.join(loc.get_metaspark_cluster_conf_dir(), config_filename)))
+            return False
+
+    program = '--exec {} -t {}'.format(config_filename, time_to_reserve) + (' -d' if debug_mode else '')
 
     command = 'ssh {0} "python3 {1}/main.py {2}"'.format(
         metacfg.ssh.ssh_key_name,
@@ -160,31 +174,27 @@ def settings():
 # The main function of MetaSpark
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-    subparser = parser.add_subparsers()
-    res.subparser(subparser)
-
+    
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--check', help='check whether environment has correct tools', action='store_true')
-    group.add_argument('--exec_internal', help=argparse.SUPPRESS, action='store_true')
-    group.add_argument('--exec', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', type=str, help='call this on the DAS5 to handle server orchestration')
+    group.add_argument('--exec_internal', nargs=1, metavar='cluster_config', type=str, help=argparse.SUPPRESS)
+    group.add_argument('--exec', nargs=1, metavar='cluster_config', type=str, help='call this on the DAS5 to handle server orchestration')
     group.add_argument('--export', help='export only metaspark and script code to the DAS5', action='store_true')
     group.add_argument('--init_internal', help=argparse.SUPPRESS, action='store_true')
     group.add_argument('--init', help='Initialize MetaSpark to run code on the DAS5', action='store_true')
-    group.add_argument('--remote', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', type=str, help='execute code on the DAS5 from your local machine')
+    group.add_argument('--remote', nargs='?', metavar='cluster_config', const='.', default='.', type=str, help='execute code on the DAS5 from your local machine')
     group.add_argument('--settings', help='Change settings', action='store_true')
-    parser.add_argument('-c', '--force-compile', dest='force_comp', help='Forces to (re)compile Zookeeper, even when build seems OK', action='store_true')
     parser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
     parser.add_argument('-e', '--force-export', dest='force_exp', help='Forces to re-do the export phase', action='store_true')
+    parser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
     args = parser.parse_args()
 
-    if res.result_args_set(args):
-        res.results(parser, args)
-    elif args.check:
+    if args.check:
         check()
     elif args.exec_internal:
-        _exec_internal(args.debug_mode)
+        _exec_internal(args.exec_internal[0], args.debug_mode)
     elif args.exec:
-        exec(args.exec, debug_mode=args.debug_mode)
+        exec(args.time_alloc, args.exec[0], args.debug_mode)
     elif args.export:
         export(full_exp=True)
     elif args.init_internal:
@@ -192,7 +202,8 @@ def main():
     elif args.init:
         init()
     elif args.remote:
-        remote(args.remote, force_exp=args.force_exp, debug_mode=args.debug_mode)
+        if args.remote == '.': args.remote = ''
+        remote(args.time_alloc, args.remote, args.debug_mode, args.force_exp)
     elif args.settings:
         settings()
 

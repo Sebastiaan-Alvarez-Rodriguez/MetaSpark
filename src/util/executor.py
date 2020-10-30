@@ -9,16 +9,16 @@ class Executor(Synchronized):
     This way, Python can continue operating while interacting 
     with subprocesses.
     '''
-    def __init__(self, cmd):
+    def __init__(self, cmd, **kwargs):
         self.cmd = cmd
         self.started = False
         self.stopped = False
         self.thread = None
         self.process = None
-        self.kwargs = None
+        self.kwargs = kwargs
 
     # Run our command. Returns immediately after booting a thread
-    def run(self, **kwargs):
+    def run(self):
         if self.started:
             raise RuntimeError('Executor already started. Make a new Executor for a new run')
         if self.stopped:
@@ -31,9 +31,18 @@ class Executor(Synchronized):
             self.process.communicate()
             self.stopped = True
 
-        self.thread = threading.Thread(target=target, kwargs=kwargs)
+        self.thread = threading.Thread(target=target, kwargs=self.kwargs)
         self.thread.start()
         self.started = True
+
+    # Run our command on this thread, waiting until it completes.
+    # Note: Some commands never return, be careful with this method!
+    def run_direct(self):
+        self.process = subprocess.Popen(self.cmd, **self.kwargs)
+        self.started = True
+        self.process.communicate()
+        self.stopped = True
+        return self.process.returncode
 
     # Block until this executor is done
     def wait(self):
@@ -46,9 +55,9 @@ class Executor(Synchronized):
 
     #  Function to run all given executors, with same arguments
     @staticmethod
-    def run_all(*executors, **kwargs):
+    def run_all(*executors):
         for x in executors:
-            x.run(**kwargs)
+            x.run()
 
     '''
     Function to wait for all executors.

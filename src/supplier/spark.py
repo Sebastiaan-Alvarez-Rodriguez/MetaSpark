@@ -20,7 +20,7 @@ def install():
     if spark_available():
         return True
 
-    depsloc = loc.get_metaspar_dep_dir()
+    depsloc = loc.get_metaspark_dep_dir()
     fs.mkdir(depsloc, exist_ok=True)
     print('Installing Spark in {0}'.format(depsloc))
 
@@ -29,15 +29,16 @@ def install():
     if not fs.isfile(archiveloc):
         for x in range(5):
             try:
-                fs.rm(archiveloc)
+                fs.rm(archiveloc, ignore_errors=True)
                 url = 'https://downloads.apache.org/spark/spark-3.0.1/spark-3.0.1-bin-hadoop2.7.tgz'
                 print('[{0}] Fetching spark from {1}'.format(x, url))
                 urllib.request.urlretrieve(url, archiveloc)
+                break
             except Exception as e:
                 if x == 0:
                     printw('Could not download Spark. Retrying...')
                 elif x == 4:
-                    printe('Could not download Spark.')
+                    printe('Could not download Spark: {}'.format(e))
                     return False
     for x in range(5):
         try:

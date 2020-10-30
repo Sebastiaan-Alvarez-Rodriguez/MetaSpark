@@ -21,16 +21,24 @@ def get_metaspark_graphs_dir():
 def get_metaspark_conf_dir():
     return fs.join(fs.abspath(), 'conf')
 
+def get_metaspark_cluster_conf_dir():
+    return fs.join(get_metaspark_conf_dir(), 'cluster')
+
 #################### Spark directories ####################
 def get_spark_dir():
     return fs.join(get_metaspark_dep_dir(), 'spark')
 
-def get_spark_bin():
+def get_spark_bin_dir():
     return fs.join(get_spark_dir(), 'bin')
 
-def get_spark_sbin():
+def get_spark_sbin_dir():
     return fs.join(get_spark_dir(), 'sbin')
 
+def get_spark_conf_dir():
+    return fs.join(get_spark_dir(), 'conf')
+
+def get_spark_logs_dir():
+    return fs.join(get_spark_dir(), 'logs')
 
 #################### Remote directories ####################
 def get_remote_metaspark_parent_dir():
@@ -42,5 +50,5 @@ def get_remote_metaspark_dir():
 
 #################### Node directories ####################
 # Because we  will use client logging using plan 2, this should change
-def get_node_log_dir():
+def get_node_local_dir():
     return '/local/{}/'.format(metacfg.ssh.ssh_user_name)

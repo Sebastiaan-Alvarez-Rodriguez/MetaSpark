@@ -20,14 +20,15 @@ def check_can_call(arglist):
 def _get_shell_java_version(location='java'):
     check_can_call([location, '-version'])
     java_version = subprocess.check_output(location+' -version 2>&1 | awk -F[\\\"_] \'NR==1{print $2}\'', shell=True).decode('utf-8').split('.')
-    return int(java_version[1])
+    tmp = int(java_version[1])
+    return tmp if tmp > 1 else int(java_version[0])
 
 # Tries to get Javac version from commandline
 def _get_shell_javac_version(location='javac'):
     check_can_call([location, '-version'])
     javac_version = subprocess.check_output(location+' -version 2>&1 | awk -F\' \' \'{print $2}\'', shell=True).decode('utf-8').split('.')
     tmp = int(javac_version[1])
-    return tmp if tmp > 1 else int(javac_version[1])
+    return tmp if tmp > 1 else int(javac_version[0])
 
 # Takes a path like /path/to/java-11-openjdk-11.0.3.../
 # Returns Java major version if it follows standard pattern, otherwise 0
@@ -120,12 +121,12 @@ def check_version(minVersion=11, maxVersion=11):
         print('Note: Java is commonly installed in /usr/lib/jvm/...')
         return False
     
-    java_version_number = _get_java_version(fs.join(os.environ['JAVA_HOME'], 'bin', 'java'))
+    java_version_number = _get_shell_java_version(fs.join(os.environ['JAVA_HOME'], 'bin', 'java'))
     if java_version_number > maxVersion:
-        printe('Your Java version is too new. Please install Java version [{0}-{1}]. If you believe you have such version, use set_java.sh and set your JAVA_HOME to this correct version.'.format(minVersion, maxVersion))
+        printe('Your Java version is too new ({}). Please install Java version [{}-{}]. If you believe you have such version, use set_java.sh and set your JAVA_HOME to this correct version.'.format(java_version_number, minVersion, maxVersion))
         returncode = False
     elif java_version_number < minVersion:
-        printe('Your Java version is too old. Please install Java version [{0}-{1}]. If you believe you have such version, use set_java.sh and set your JAVA_HOME to this correct version'.format(minVersion, maxVersion))
+        printe('Your Java version is too old ({}). Please install Java version [{}-{}]. If you believe you have such version, use set_java.sh and set your JAVA_HOME to this correct version'.format(java_version_number, minVersion, maxVersion))
         returncode = False
 
     

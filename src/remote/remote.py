@@ -3,132 +3,72 @@
 # Goal of this file is to guide data processing on server and client nodes.
 
 
+import socket
 import time
 
+import config.cluster as clr
 import remote.util.identifier as idr
-from remote.util.syncer import Syncer
+import remote.util.ip as ip
+# from remote.util.syncer import Syncer
 import util.fs as fs
 import util.location as loc
+from util.executor import Executor
 from util.printer import *
 
+# Boots master. Spark works with Daemons, so expect to return quickly from this function
+def boot_master(cluster_cfg, port, debug_mode):
+    lid = idr.identifier_local()
+    spark_conf_dir = loc.get_spark_conf_dir() #"${SPARK_CONF_DIR:-"${SPARK_HOME}/conf"}"
+    fqdn = socket.getfqdn()
 
-# Controls server nodes. Executed by all servers.
-def run_server(debug_mode):
-    experiment = Experiment.load()
-    timestamp = experiment.timestamp
-    repeats = experiment.metaspark.repeats
+    scriptloc = fs.join(loc.get_spark_sbin_dir(), 'start-master.sh')
 
-    config = config_construct_server(experiment)
-    srv.populate_config(config, debug_mode)
-    if config.gid == 0:
-        print('Network booted. Prime ready!')
-        with open(fs.join(loc.get_cfg_dir(), '.metaspark.cfg'), 'w') as file:
-            file.write('\n'.join(srv.gen_connectionlist(config, experiment)))
-
-    syncer = Syncer(config, experiment, 'server', debug_mode)
-
-    # All servers must generate a config
-    srv.gen_zookeeper_config(config)
-    # All servers must write their myid file
-    srv.prepare_datadir(config)
-
-    # If cleaning is requested, boot cleaner service
-    if experiment.server_periodic_clean > 0:
-        clean_repeater = Repeater(lambda: srv.clean_data(config), experiment.server_periodic_clean)
-        clean_repeater.start()
-
-    global_status = True
-    for repeat in range(repeats):
-
-        # Make/clean a directory on a local node disk to log quickly.
-        # Only one process on a node has to do this
-        if config.lid == 0:
-            fs.rm(loc.get_node_log_dir(), ignore_errors=True)
-            fs.mkdir(loc.get_node_log_dir(), exist_ok=True)
-
-        # Must wait and synchronise with all servers and clients
-        syncer.sync()
-        
-
-        local_log = fs.join(loc.get_node_log_dir(), 'server{}.log'.format(config.gid))
-        executor = srv.boot(config, local_log)
-
-        experiment.experiment_server(config, executor, repeat, lambda: srv.is_leader(local_log))
-        status = srv.stop(executor)
-        
-        global_status &= status
-
-        # Write server log to zookeeper/metaspark/results/<repeat>/
-        if fs.isfile(local_log):
-            fs.mv(local_log, fs.join(loc.get_metaspark_results_dir(), timestamp, repeat, fs.basename(local_log)))
-        
-        if config.gid == 0:
-            prints('Server iteration {}/{} complete'.format(repeat+1, repeats))
-        
-        # We log failed executions in a results/<timestamp>/failures.metalog
-        if not status:
-            printw('Server {} status in iteration {}/{} not good'.format(config.gid, repeat, repeats-1))
-            with open(fs.join(loc.get_metaspark_results_dir(), timestamp, 'failures.metalog'), 'a') as file:
-                file.write('server:{}:{}\n'.format(config.gid, repeat))
-
-    # If cleaning is requested, stop cleaner service
-    if experiment.server_periodic_clean > 0:
-        clean_repeater.stop()
-
-    syncer.close()
-
-    # Delete sync dir and communication file
-    if config.gid == 0:
-        fs.rm(loc.get_cfg_dir(), '.metaspark.cfg')
-
-    return global_status
-
-
-# Controls client nodes. Executed by all clients.
-def run_client(debug_mode):
-    experiment = Experiment.load()
-    timestamp = experiment.timestamp
-    repeats = experiment.metaspark.repeats
-
-    #  We must wait until the servers make themselves known
-    while not fs.isfile(loc.get_cfg_dir(), '.metaspark.cfg'):
-        time.sleep(1)
-    # We read the serverlist
-    with open(fs.join(loc.get_cfg_dir(), '.metaspark.cfg'), 'r') as file:
-        # <node101>:<clientport1>
-        hosts = [line.strip() for line in file.readlines()]
+    spark_webui_port = 2205
     
-    config = config_construct_client(experiment, hosts)
+    
+    cmd = '{} --host {} --port {} --webui-port {}'.format(scriptloc, fqdn, port, spark_webui_port)
+    cmd += '2>&1 > devnull' if not debug_mode else ''
+    executor = Executor(cmd, shell=True)
+    retval = executor.run_direct() == 0
+    printc('MASTER ready on spark://{}:{}'.format(ip.master_address(cluster_cfg.infiniband), port), Color.CAN)
+    return retval
 
-    syncer = Syncer(config, experiment, 'client', debug_mode)
+# Boots a slave. Spark works with Daemons, so expect to return quickly from this function
+def boot_slave(cluster_cfg, master_port, debug_mode):
+    gid = idr.identifier_global()
+    lid = idr.identifier_local()
+    scriptloc = fs.join(loc.get_spark_sbin_dir(), 'start-slave.sh')
+    master_url = 'spark://{}:{}'.format(ip.master_address(cluster_cfg.infiniband), master_port)
 
-    global_status = True
-    for repeat in range(repeats):
-        # We make a directory on a local node disk to log quickly.
-        # Only one process on a node has to do this
-        if config.lid == 0:
-            fs.mkdir(loc.get_node_log_dir(), exist_ok=True)
+    workdir = fs.join(loc.get_node_local_dir(), lid)
+    fs.rm(workdir, ignore_errors=True)
+    fs.mkdir(workdir)
 
-        # Must wait and synchronise with all servers and clients
-        
-        if debug_mode: print('Client {} stage PRE_SYNC'.format(idr.identifier_global()))
-        syncer.sync()
-        if debug_mode: print('Client {} stage POST_SYNC'.format(idr.identifier_global()))
-        
-        executor = cli.boot(config, experiment, repeat)
-        experiment.experiment_client(config, executor, repeat)
-        status = cli.stop(executor)
-        global_status &= status
+    port = master_port+lid #Adding lid ensures we use different ports when sharing a node
+    webui_port = 8080+lid 
+    if debug_mode: print('Slave {}:{} connecting to {}, standing by on port {}'.format(gid, lid, master_url, port))
+    fqdn = socket.getfqdn()
+    
+    cmd = '{} {} --cores 1 --memory 1024M --work-dir {} --host {} --port {} --webui-port {}'.format(scriptloc, master_url, workdir, fqdn, port, webui_port)
+    cmd += '2>&1 > devnull' if not debug_mode else ''
+    
+    executor = Executor(cmd, shell=True)
+    return executor.run_direct() == 0
 
-        local_log = fs.join(loc.get_node_log_dir(), '{}.log'.format(config.gid))
-        # Move the client log file (if it exists) from local disk to shared storage
-        if fs.isfile(local_log):
-            fs.mv(fs.join(loc.get_node_log_dir(), local_log), fs.join(loc.get_metaspark_results_dir(), timestamp, repeat, fs.basename(local_log)))
 
-        # We log failed executions in a results/<timestamp>/failures.metalog
-        if not status:
-            printw('Client {} status in iteration {}/{} not good'.format(config.gid, repeat+1, repeats))
-            with open(fs.join(loc.get_metaspark_results_dir(), timestamp, 'failures.metalog'), 'a') as file:
-                file.write('server:{}:{}\n'.format(config.gid, repeat))
-    syncer.close()
-    return global_status
+# Run with debug_mode (True/False) and the name of the clusterconfig to load
+def run(configname, debug_mode):
+    cluster_cfg = clr.load_cluster_config(configname)
+    port = 7077
+    gid = idr.identifier_global()
+    lid = idr.identifier_local()
+
+    status = boot_master(cluster_cfg, port, debug_mode) if gid == 0 else boot_slave(cluster_cfg, port, debug_mode)
+    if not status:
+        printe('Error booting ', end='')
+        print('Master' if gid==0 else 'slave {}:{}'.format(gid, lid))
+
+    if gid == 0:
+        print('')
+    while True: # Sleep forever, 1 minute at a time
+        time.sleep(60)

@@ -9,9 +9,6 @@ import util.location as loc
 from util.printer import *
 import util.ui as ui
 
-def get_metaspark_cluster_conf_dir():
-    return fs.join(loc.get_metaspark_conf_dir(), 'cluster')
-
 def ask_nodes():
     return ui.ask_int('How many physical nodes to allocate for this cluster?')
 
@@ -26,13 +23,14 @@ def ask_affinity(nodes):
 def ask_infiniband():
     return ui.ask_bool('Use infiniband connection between the servers for communication?')
 
+
 # Generate a config by asking the user relevant questions
 def gen_config():
     nodes = ask_nodes()
     affinity = ask_affinity(nodes)
     infiniband = ask_infiniband()
     while True:
-        configloc = fs.join(get_metaspark_cluster_conf_dir(), fs.basename(ui.ask_string('Please give a name to this configuration')))
+        configloc = fs.join(loc.get_metaspark_cluster_conf_dir(), fs.basename(ui.ask_string('Please give a name to this configuration')))
         if not configloc.endswith('.cfg'):
             configloc += '.cfg'
         if (not fs.isfile(configloc)) or ui.ask_bool('Config "{}" already exists, override?').format(configloc):
@@ -44,7 +42,7 @@ def gen_config():
 
 # Persist a configuration to file using given variables
 def write_config(configloc, nodes, coallocation_affinity, infiniband):
-    fs.mkdir(get_metaspark_cluster_conf_dir(), exist_ok=True)
+    fs.mkdir(loc.get_metaspark_cluster_conf_dir(), exist_ok=True)
     parser = configparser.ConfigParser()
     parser['Cluster'] = {
         'nodes': nodes,
@@ -53,21 +51,6 @@ def write_config(configloc, nodes, coallocation_affinity, infiniband):
     }
     with open(configloc, 'w') as file:
         parser.write(file)
-
-
-# Gets a cluster config to use. Asks user if multiple candidates exist
-def get_cluster_config():
-    fs.mkdir(get_metaspark_cluster_conf_dir(), exist_ok=True)
-
-    cfg_paths = [x for x in fs.ls(get_metaspark_cluster_conf_dir(), only_files=True, full_paths=True) if x.endswith('.cfg')]
-    if len(cfg_paths) == 0: #Build a cluster config if none exist
-        path = gen_config()
-        return ClusterConfig(path)
-    elif len(cfg_paths) == 1:
-        return ClusterConfig(cfg_paths[0])
-    else:
-        idx = ask_pick('Which cluster-config to load?', [fs.basename(x) for x in cfg_paths])
-        return ClusterConfig(cfg_paths[idx])
 
 
 # Check if all required data is present in the config
@@ -96,7 +79,7 @@ class ClusterConfig(object):
         validate_settings(path)
         self.parser = configparser.ConfigParser()
         self.parser.read(path)
-
+        self._path = path
 
     # Size of our cluster (in nodes, each node has coallocation_affinity processes)
     @property
@@ -113,7 +96,33 @@ class ClusterConfig(object):
     def infiniband(self):
         return self.parser['Cluster']['infiniband'] == 'True'
 
+    @property
+    def path(self):
+        return self._path
+
+
     # Persist current settings
     def persist():
         with open(config_loc, 'w') as file:
             parser.write(file)
+
+
+# Gets a cluster config to use. Asks user if multiple candidates exist
+# Returns cluster config, and a boolean describing whether we should export conf data or not
+def get_cluster_config():
+    fs.mkdir(loc.get_metaspark_cluster_conf_dir(), exist_ok=True)
+
+    cfg_paths = [x for x in fs.ls(loc.get_metaspark_cluster_conf_dir(), only_files=True, full_paths=True) if x.endswith('.cfg')]
+    if len(cfg_paths) == 0: #Build a cluster config if none exist
+        path = gen_config()
+        return ClusterConfig(path), True
+    else:
+        idx = ui.ask_pick('Which cluster-config to load?', ['Generate new config']+[fs.basename(x) for x in cfg_paths])
+        if idx == 0:
+            path = gen_config()
+            return ClusterConfig(path), True
+        return ClusterConfig(cfg_paths[idx-1]), False
+
+# Load a cluster config with given filename from disk and return it
+def load_cluster_config(config_filename):
+    return ClusterConfig(fs.join(loc.get_metaspark_cluster_conf_dir(), config_filename))
