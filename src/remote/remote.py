@@ -19,19 +19,19 @@ from util.printer import *
 def boot_master(cluster_cfg, port, debug_mode):
     lid = idr.identifier_local()
     spark_conf_dir = loc.get_spark_conf_dir() #"${SPARK_CONF_DIR:-"${SPARK_HOME}/conf"}"
-    fqdn = socket.getfqdn()
+
 
     scriptloc = fs.join(loc.get_spark_sbin_dir(), 'start-master.sh')
 
     spark_webui_port = 2205
-    
-    
-    cmd = '{} --host {} --port {} --webui-port {}'.format(scriptloc, fqdn, port, spark_webui_port)
+
+    cmd = '{} --host {} --port {} --webui-port {}'.format(scriptloc, ip.master_address(cluster_cfg.infiniband), port, spark_webui_port)
     cmd += '2>&1 > devnull' if not debug_mode else ''
     executor = Executor(cmd, shell=True)
     retval = executor.run_direct() == 0
     printc('MASTER ready on spark://{}:{}'.format(ip.master_address(cluster_cfg.infiniband), port), Color.CAN)
     return retval
+
 
 # Boots a slave. Spark works with Daemons, so expect to return quickly from this function
 def boot_slave(cluster_cfg, master_port, debug_mode):
@@ -45,7 +45,9 @@ def boot_slave(cluster_cfg, master_port, debug_mode):
     fs.mkdir(workdir)
 
     port = master_port+lid #Adding lid ensures we use different ports when sharing a node
-    webui_port = 8080+lid 
+    webui_port = 8080+lid
+
+    time.sleep(5)
     if debug_mode: print('Slave {}:{} connecting to {}, standing by on port {}'.format(gid, lid, master_url, port))
     fqdn = socket.getfqdn()
     
@@ -65,8 +67,7 @@ def run(configname, debug_mode):
 
     status = boot_master(cluster_cfg, port, debug_mode) if gid == 0 else boot_slave(cluster_cfg, port, debug_mode)
     if not status:
-        printe('Error booting ', end='')
-        print('Master' if gid==0 else 'slave {}:{}'.format(gid, lid))
+        printe('Error booting {}'.format('Master' if gid==0 else 'slave {}:{}'.format(gid, lid)))
 
     if gid == 0:
         print('')

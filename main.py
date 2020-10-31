@@ -11,6 +11,7 @@ import time
 sys.path.append(os.path.join(os.path.abspath(os.path.dirname(sys.argv[0])), 'src'))
 from config.meta import cfg_meta_instance as metacfg
 import config.cluster as clr
+import deploy.deploy as deploy
 import remote.remote as rmt
 import supplier.spark as spk
 import supplier.java as jv
@@ -97,7 +98,7 @@ def export(full_exp=False):
         command+= ' --exclude '+' --exclude '.join([
             '.git',
             '__pycache__',
-            'results', 
+            'results',
             'graphs'])
         if not clean():
             printe('Cleaning failed')
@@ -115,7 +116,7 @@ def export(full_exp=False):
         return True
     else:
         printe('Export failure!')
-        return False    
+        return False
 
 
 def _init_internal():
@@ -173,7 +174,9 @@ def settings():
 # The main function of MetaSpark
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-    
+    subparser = parser.add_subparsers()
+    deploy.subparser(subparser)
+
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--check', help='check whether environment has correct tools', action='store_true')
     group.add_argument('--exec_internal', nargs=1, metavar='cluster_config', type=str, help=argparse.SUPPRESS)
@@ -188,6 +191,8 @@ def main():
     parser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
     args = parser.parse_args()
 
+    if deploy.deploy_args_set(args):
+        deploy.deploy(parser, args)
     if args.check:
         check()
     elif args.exec_internal:

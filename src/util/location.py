@@ -24,6 +24,9 @@ def get_metaspark_conf_dir():
 def get_metaspark_cluster_conf_dir():
     return fs.join(get_metaspark_conf_dir(), 'cluster')
 
+def get_metaspark_jar_dir():
+    return fs.join(fs.abspath(), 'jars')
+
 #################### Spark directories ####################
 def get_spark_dir():
     return fs.join(get_metaspark_dep_dir(), 'spark')
