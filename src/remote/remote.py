@@ -9,7 +9,6 @@ import time
 import config.cluster as clr
 import remote.util.identifier as idr
 import remote.util.ip as ip
-# from remote.util.syncer import Syncer
 import util.fs as fs
 import util.location as loc
 from util.executor import Executor
@@ -69,7 +68,10 @@ def run(configname, debug_mode):
     if not status:
         printe('Error booting {}'.format('Master' if gid==0 else 'slave {}:{}'.format(gid, lid)))
 
-    if gid == 0:
-        print('')
-    while True: # Sleep forever, 1 minute at a time
-        time.sleep(60)
+    try:
+        while True: # Sleep forever, 1 minute at a time
+            time.sleep(60)
+    except KeyboardInterrupt as e:
+        if gid == 0:
+            printw('Shutting down')
+            exit(0 if status else 1)

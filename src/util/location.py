@@ -15,14 +15,17 @@ def get_metaspark_experiment_dir():
 def get_metaspark_results_dir():
     return fs.join(fs.abspath(), 'results')
 
-def get_metaspark_graphs_dir():
-    return fs.join(fs.abspath(), 'graphs')
+def get_metaspark_logs_dir():
+    return fs.join(fs.abspath(), 'logs')
 
 def get_metaspark_conf_dir():
     return fs.join(fs.abspath(), 'conf')
 
 def get_metaspark_cluster_conf_dir():
     return fs.join(get_metaspark_conf_dir(), 'cluster')
+
+def get_metaspark_log4j_conf_dir():
+    return fs.join(get_metaspark_conf_dir(), 'log4j')
 
 def get_metaspark_jar_dir():
     return fs.join(fs.abspath(), 'jars')

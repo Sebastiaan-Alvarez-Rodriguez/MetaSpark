@@ -18,7 +18,6 @@ import supplier.java as jv
 from util.executor import Executor
 import util.location as loc
 import util.fs as fs
-import util.time as tm
 import util.ui as ui
 from util.printer import *
 
@@ -174,8 +173,8 @@ def settings():
 # The main function of MetaSpark
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
-    subparser = parser.add_subparsers()
-    deploy.subparser(subparser)
+    subparsers = parser.add_subparsers(help='Subcommands', dest='command')
+    deploy.subparser(subparsers)
 
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--check', help='check whether environment has correct tools', action='store_true')
