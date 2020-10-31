@@ -192,7 +192,7 @@ def main():
     args = parser.parse_args()
 
     if deploy.deploy_args_set(args):
-        deploy.deploy(parser, args)
+        return deploy.deploy(parser, args)
     if args.check:
         check()
     elif args.exec_internal:
