@@ -21,4 +21,4 @@ class Deployment(object):
     # Load deployment from disk
     @staticmethod
     def load(file):
-        return Deployment(nodes=[x.strip() for x in f.readlines()])
+        return Deployment(nodes=[x.strip() for x in file.readlines()])

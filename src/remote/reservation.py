@@ -4,6 +4,7 @@ import subprocess
 import time
 
 from remote.deployment import Deployment
+import util.fs as fs
 from util.printer import *
 
 class Reserver(object):
@@ -20,6 +21,10 @@ class Reserver(object):
             self._deployment = Deployment(reservation_number=self._reservation_number)
         return self._deployment
 
+    @property
+    def reservation_number(self):
+        return self._reservation_number
+    
     # Reserve on DAS5 using given parameters
     def reserve(self, hosts, time_to_reserve, wait=True):
         reserve_command = 'preserve -np {} -1 -t {}'.format(hosts, time_to_reserve)
@@ -28,31 +33,58 @@ class Reserver(object):
         print('Made reservation {}'.format(self._reservation_number))
         if wait:
             print_start = True
-            while not self._reservation_active():
+            while not Reserver._reservation_active(self._reservation_number):
                 if print_start:
                     print('Waiting for reservation...')
                     print_start
                 time.sleep(1)
             prints('Reservation ready!')
         
-
-    # Returns True if reservation with given number is active, False otherwise
-    def _reservation_active(self):
+    # Stops reservation
+    def stop(self):
         if self._reservation_number == None:
-            raise RuntimeError('Cannot check if reservation is active without reservation number!')
-        return subprocess.check_output("preserve -llist | grep "+str(self._reservation_number)+" | awk '{ print $9 }'", shell=True).decode('utf-8').strip().startswith('node')
+            raise RuntimeError('Cannot stop reservation without reservation number')
+        retval = subprocess.call('preserve -c {}'.format(self.reservation_number), shell=True) == 0
+        if not retval:
+            printe('Error while stopping cluster with id {}'.format(self._reservation_number))
+        else:
+            fs.rm(fs.abspath(), 'reservation')
+        return retval
 
     # Store information about this object on disk, so we can load it later
     def persist(self):
         if self._reservation_number == None:
             raise RuntimeError('Nothing to persist: Missing reservation number!')
         with open(fs.join(fs.abspath(), 'reservation'), 'w') as file:
-            file.write(self._reservation_number+'\n')
+            file.write(str(self._reservation_number)+'\n')
             self.deployment.persist(file)
 
+
+    # Returns True if reservation exists, False otherwise
+    @staticmethod
+    def _reservation_active(reservation_number):
+        if reservation_number == None:
+            raise RuntimeError('Cannot check if reservation is active without reservation number!')
+        return subprocess.check_output("preserve -llist | grep "+str(reservation_number)+" | awk '{ print $9 }'", shell=True).decode('utf-8').strip().startswith('node')
+
+
+    # Load reservation from disk, if it exists.
+    # Raises FileNotFoundError if there is no reservation file
+    # Raises ReservationExpiredError if reservation has expired
+    # Returns the reservation
     @staticmethod
     def load():
+        if not fs.isfile(fs.abspath(), 'reservation'):
+            raise FileNotFoundError('No reservation found')
         with open(fs.join(fs.abspath(), 'reservation'), 'r') as file:
             r = Reserver()
-            r.reservation_number = int(file.readline())
+            r._reservation_number = int(file.readline().strip())
+            if not Reserver._reservation_active(r.reservation_number):
+                fs.rm(fs.abspath(), 'reservation')
+                raise ReservationExpiredError('Reservation found, but no longer active!')
             r._deployment = Deployment.load(file)
+            return r
+
+class ReservationExpiredError(Exception):
+    pass
+

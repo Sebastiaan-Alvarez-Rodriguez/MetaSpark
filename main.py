@@ -50,9 +50,27 @@ def exec(time_to_reserve, config_filename, debug_mode):
     print('Connected! Using cluster configuration "{}"'.format(config_filename))
     cluster_cfg = clr.load_cluster_config(config_filename)
 
-    print('Booting cluster ({} nodes) for time: {}'.format(cluster_cfg.nodes, time_to_reserve))
 
     nodes = cluster_cfg.nodes + 1 # We always want 1 node for the spark master alone
+    if cluster_cfg.coallocation_affinity > 1:
+        nodes = cluster_cfg.coallocation_affinity * cluster_cfg.nodes+1
+        printw('''
+Warning! Configuration specifies "{}" workers per node, {} nodes.
+MetaSpark version RESERVE can only spawn 1 process per node,
+due to some annoying things in Spark 3.0+.
+Spawning {} nodes instead to service your request!
+'''.format(cluster_cfg.coallocation_affinity, cluster_cfg.nodes, nodes-1))
+
+    try:
+        reserver = Reserver.load()
+        if ui.ask_bool('Found active reservation. Kill it and spawn new (Y) or cancel (n)?'):
+            if reserver.stop():
+                prints('Stopped reservation successfully!')
+            else:
+                return False
+    except Exception as e:
+        pass
+    print('Booting cluster ({} nodes) for time: {}'.format(cluster_cfg.nodes, time_to_reserve))
 
     reserver = Reserver()
     reserver.reserve(nodes, time_to_reserve)
@@ -71,8 +89,10 @@ def exec(time_to_reserve, config_filename, debug_mode):
     if not status:
         return False
 
+    time.sleep(5) #Give master deamon a head start
+
     # Boot all slaves in parallel
-    status = rmt.boot_slaves(reserver.deployment.nodes[1:], cluster_cfg.coallocation_affinity, reserver.deployment.nodes[0], debug_mode=debug_mode)
+    status = rmt.boot_slaves(reserver.deployment.nodes[1:], reserver.deployment.nodes[0], debug_mode=debug_mode)
     
     # Persists reservation info (reservation number, nodes)
     reserver.persist()
@@ -135,7 +155,7 @@ def init():
 
 
 # Handles remote commandline argument
-def remote(time_to_reserve, config_filename, debug_mode, force_exp):
+def remote_start(time_to_reserve, config_filename, debug_mode, force_exp):
     if force_exp and not export(full_exp=True):
         printe('Could not export data')
         return False
@@ -159,10 +179,36 @@ def remote(time_to_reserve, config_filename, debug_mode, force_exp):
     print('Connecting using key "{0}"...'.format(metacfg.ssh.ssh_key_name))
     return os.system(command) == 0
 
+# Stop the remote cluster, if any is running
+def remote_stop():
+    program = '--stop'
+    command = 'ssh {0} "python3 {1}/main.py {2}"'.format(
+        metacfg.ssh.ssh_key_name,
+        loc.get_remote_metaspark_dir(),
+        program)
+    print('Connecting using key "{0}"...'.format(metacfg.ssh.ssh_key_name))
+    return os.system(command) == 0
+
+
 # Redirects execution to settings.py, where user can change settings
 def settings():
     metacfg.change_settings()
 
+# Stop cluster running here, if any is running
+def stop(silent=False):
+    try:
+        reserver = Reserver.load()
+        retval = reserver.stop()
+        if not silent:
+            if retval:
+                prints('Reservation {} successfully stopped!'.format(reserver.reservation_number))
+            else:
+                printe('Could not stop reservation with id {}'.format(reserver.reservation_number))
+        return retval
+    except FileNotFoundError as e:
+        if not silent: print('No reservation found on remote')
+    except Exception as e:
+        if not silent: print('Reservation file found, no longer active')
 
 # The main function of MetaSpark
 def main():
@@ -177,8 +223,10 @@ def main():
     group.add_argument('--export', help='export only metaspark and script code to the DAS5', action='store_true')
     group.add_argument('--init_internal', help=argparse.SUPPRESS, action='store_true')
     group.add_argument('--init', help='Initialize MetaSpark to run code on the DAS5', action='store_true')
-    group.add_argument('--remote', nargs='?', metavar='cluster_config', const='.', default='.', type=str, help='execute code on the DAS5 from your local machine')
+    group.add_argument('--remote-start', dest='remote_start', nargs='?', metavar='cluster_config', type=str, help='execute code on the DAS5 from your local machine')
+    group.add_argument('--remote-stop', dest='remote_stop', help='Stop cluster on DAS5 from your local machine', action='store_true')
     group.add_argument('--settings', help='Change settings', action='store_true')
+    group.add_argument('--stop', help='Stop any cluster that currently runs on this machine', action='store_true')
     parser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
     parser.add_argument('-e', '--force-export', dest='force_exp', help='Forces to re-do the export phase', action='store_true')
     parser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
@@ -198,9 +246,12 @@ def main():
         _init_internal()
     elif args.init:
         init()
-    elif args.remote:
-        if args.remote == '.': args.remote = ''
-        remote(args.time_alloc, args.remote, args.debug_mode, args.force_exp)
+    elif args.remote_start:
+        remote_start(args.time_alloc, args.remote_start, args.debug_mode, args.force_exp)
+    elif args.remote_stop:
+        remote_stop()
+    elif args.stop:
+        stop()
     elif args.settings:
         settings()
 

@@ -36,62 +36,55 @@ probably even before the slave is actually ready
 
 Provide
     node:           ip/hostname of node to boot this worker
-    lid:            local id on the given node. Must be different for each spawn
     master_node:    ip/hostname of master
     master_port:    port for master
+    procs_per_node: Amount of slaves to spawn on this node
     debug_mode:     True if we must print debug info, False otherwise
-    execute:        Function executes built command and returns state_ok (another bool) if True, returns command if False
+    execute:        Function executes built command and returns state_ok (another bool) if True, returns Executor if False
 '''
-def boot_slave(node, lid, master_node, master_port=7077, debug_mode=False, execute=True):
+def boot_slave(node, master_node, master_port=7077, debug_mode=False, execute=True):
     scriptloc = fs.join(loc.get_spark_sbin_dir(), 'start-slave.sh')
     master_url = 'spark://{}:{}'.format(master_node, master_port)
 
-    workdir = fs.join(loc.get_node_local_dir(), lid)
+    # workdir = fs.join(loc.get_node_local_dir(), lid)
     # fs.rm(workdir, ignore_errors=True)
     # fs.mkdir(workdir)
 
-    port = master_port+lid #Adding lid ensures we use different ports when sharing a node
-    webui_port = 8080+lid
+    # port = master_port+lid #Adding lid ensures we use different ports when sharing a node
+    # webui_port = 8080+lid
 
-    if debug_mode: print('Slave {}:{} connecting to {}, standing by on port {} (webui-port: {})'.format(gid, lid, master_url, port, webui_port))
-    fqdn = socket.getfqdn()
-    
-    cmd = 'ssh {} "{} {} --cores 1 --memory 1024M --work-dir {} --host {} --port {} --webui-port {}"'.format(
+    if debug_mode: print('Spawning worker on {}'.format(node))
+
+    cmd = 'ssh {} "{} {} {}"'.format(
             node,
             scriptloc,
             master_url,
-            workdir,
-            fqdn,
-            port,
-            webui_port,
-            '2>&1 > devnull' if not debug_mode else ''
+            '> /dev/null 2>&1' if not debug_mode else ''
         )
 
+    executor = Executor(cmd, shell=True)
     if execute:
-        executor = Executor(cmd, shell=True)
         retval = executor.run_direct() == 0
-        if debug:
+        if debug_mode:
             if retval:
-                prints('Booted slave {}:{}!'.format(node, lid))
+                prints('Booted slave on {}!'.format(node))
             else:
-                printe('Failed to boot slave {}:{}!'.format(node, lid))
+                printe('Failed to boot slave on {}'.format(node))
         return retval
-    return cmd
+    return executor
 
 '''
 Boots multiple slaves in parallel.
 
 Provide
     nodes:          ip/hostname list of nodes to boot workers on
-    procs_per_node: Amount of processes to spawn
     master_node:    ip/hostname of master
     master_port:    port for master
     debug_mode:     True if we must print debug info, False otherwise
 '''
-def boot_slaves(nodes, procs_per_node, master_node, master_port=7077, debug_mode=False):
+def boot_slaves(nodes, master_node, master_port=7077, debug_mode=False):
     executors = []
     for node in nodes:
-        for x in range(procs_per_node):
-            executors.append(Executor(boot_slave(node, x, master_node, master_port=master_port, debug_mode=debug_mode), shell=True))
-    Executor.run_all(executors)
-    return Executor.wait_all(executors)
+        executors.append(boot_slave(node, master_node, master_port=master_port, execute=False, debug_mode=debug_mode))
+    Executor.run_all(*executors)
+    return Executor.wait_all(*executors)
