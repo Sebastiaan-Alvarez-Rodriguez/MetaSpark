@@ -118,6 +118,7 @@ class SSHConfig(object):
         self.picked = fs.join(get_metaspark_ssh_conf_dir(), name+'.cfg')
         validate_settings(self.picked)
         self.parser = configparser.ConfigParser()
+        self.parser.optionxform=str
         self.parser.read(self.picked)
 
 

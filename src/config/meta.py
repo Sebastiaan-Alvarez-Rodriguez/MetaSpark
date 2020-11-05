@@ -95,6 +95,7 @@ class MetaConfig(object):
         else:
             validate_settings(loc)
         self.parser = configparser.ConfigParser()
+        self.parser.optionxform=str
         self.parser.read(loc)
 
         self._ssh = ssh.SSHConfig(self.ssh_config_name)

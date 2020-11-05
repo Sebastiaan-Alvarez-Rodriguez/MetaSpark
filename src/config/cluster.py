@@ -10,18 +10,18 @@ from util.printer import *
 import util.ui as ui
 
 def ask_nodes():
-    return ui.ask_int('How many physical nodes to allocate for this cluster?')
+    return ui.ask_int('How many physical nodes to allocate for the worker nodes in this cluster (note: master always gets 1 node for itself)?')
 
 def ask_affinity(nodes):
     while True:
-        ans = ui.ask_int('How many processes to launch per node in the cluster? (must be divisible by #nodes ({}))'.format(nodes))
+        ans = ui.ask_int('How many worker processes to launch per worker node in the cluster? (must be divisible by #nodes ({}))'.format(nodes))
         if ans % nodes != 0:
             printe('{0} is not divisible by {1} ({0}%{1}={2})'.format(ans, nodes, ans % nodes))
         else:
             return ans
 
 def ask_infiniband():
-    return ui.ask_bool('Use infiniband connection between the servers for communication?')
+    return ui.ask_bool('Use infiniband connection between the nodes for communication?')
 
 
 # Generate a config by asking the user relevant questions
@@ -78,6 +78,7 @@ class ClusterConfig(object):
     def __init__(self, path):
         validate_settings(path)
         self.parser = configparser.ConfigParser()
+        self.parser.optionxform=str
         self.parser.read(path)
         self._path = path
 
