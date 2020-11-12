@@ -1,9 +1,10 @@
 # This file contains code to generate a small config file,
 # containing cluster options.
 
-
 import configparser
+import os
 
+from config.meta import cfg_meta_instance as metacfg
 import util.fs as fs
 import util.location as loc
 from util.printer import *
@@ -33,7 +34,7 @@ def gen_config():
         configloc = fs.join(loc.get_metaspark_cluster_conf_dir(), fs.basename(ui.ask_string('Please give a name to this configuration')))
         if not configloc.endswith('.cfg'):
             configloc += '.cfg'
-        if (not fs.isfile(configloc)) or ui.ask_bool('Config "{}" already exists, override?').format(configloc):
+        if (not fs.isfile(configloc)) or ui.ask_bool('Config "{}" already exists, override?'.format(configloc)):
             write_config(configloc, nodes, affinity, infiniband)
             return configloc
         else:
@@ -59,6 +60,8 @@ def validate_settings(config_loc):
     d['Cluster'] = {'nodes', 'coallocation_affinity', 'infiniband'}
     
     parser = configparser.ConfigParser()
+    parser.optionxform=str
+        
     parser.read(config_loc)
     for key in d:
         if not key in parser:
@@ -69,7 +72,7 @@ def validate_settings(config_loc):
                     raise RuntimeError('Missing key "{}" in section "{}"'.format(subkey, key))
 
 
-class ClusterConfig(object):    
+class ClusterConfig(object):
     '''
     Object to store cluster configuration settings.
     This way, we do not have to ask the user every run what cluster
@@ -101,10 +104,9 @@ class ClusterConfig(object):
     def path(self):
         return self._path
 
-
     # Persist current settings
     def persist():
-        with open(config_loc, 'w') as file:
+        with open(config_loc, 'w') as file: #TODO: config_loc must be self._path?
             parser.write(file)
 
 
@@ -127,3 +129,20 @@ def get_cluster_config():
 # Load a cluster config with given filename from disk and return it
 def load_cluster_config(config_filename):
     return ClusterConfig(fs.join(loc.get_metaspark_cluster_conf_dir(), config_filename))
+
+def export_configs():
+    os.system('rsync -az {} {}:{}'.format(loc.get_metaspark_cluster_conf_dir(), metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_conf_dir()))
+
+# If config_filename is given, loads config. Otherwise, asks for config.
+def get_or_create_cluster_config(config_filename=None):
+    if config_filename == None or len(config_filename) == 0: # user did not provide config, so ask for it
+        config, should_export = get_cluster_config()
+        if should_export:
+            export_configs() # Export new config
+        return config
+    else: # user provided a config, load it
+        if fs.isfile(loc.get_metaspark_cluster_conf_dir(), config_filename):
+            return load_cluster_config(config_filename)
+        else:
+            printe('Provided config "{}" does not exist!'.format(fs.join(loc.get_metaspark_cluster_conf_dir(), config_filename)))
+            return False

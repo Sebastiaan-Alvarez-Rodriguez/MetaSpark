@@ -14,23 +14,39 @@ python3 main.py --init
 Generally, you will want to *spawn* a cluster, and then *deploy* an application on it.
 To spawn a cluster, use:
 ```bash
-python3 main.py --remote
+python3 main.py remote start
 ```
 When the cluster is ready, it prints out its master url, which we need when deploying.
 To deploy a cluster, use:
 ```bash
-python3 main.py deploy jarfile mainclass master_url --args foo bar 42 bazz
+python3 main.py deploy jarfile mainclass --args foo bar 42 bazz
 ```
-The jarfile is the jarfile you wish to deploy.
-mainclass is the package-path to the class with a main function you wish to run.
-The master_url is the url we see printed when spawning a cluster.
-Args are arguments that we pass on to your jarfile, and is optional.  
+Here:
+ 1. jarfile is the jarfile you wish to deploy.
+ 2. mainclass is the package-path to the class with a main function you wish to run.
+ 3. Args are arguments that we pass on to your jarfile, and is optional (hence the '--')
 
-Use the following command to see all available options for spawning a cluster:
+Use the following command to see all available top-level commands for MetaSpark:
 ```bash
 python3 main.py -h
 ```
-Use the following command to see all available options for deploying a cluster:
+To get more detailed help for a command, type the command, followed by `-h`. E.g:
 ```bash
 python3 main.py deploy -h
+```
+
+### Example usage
+Here, we give a valid and complete example of how to deploy on the DAS5. We assume that:
+ 1. you have an ssh key ready with name `das5key`.
+ 2. you have DAS5 username `SOME_USER`
+ 3. you have downloaded `scopt_2.12-3.7.1.jar` and 
+ `spark-examples_2.12-3.0.1.jar` to directory `<project_root>/jars/`.
+
+Here we go:
+```bash
+python3 main.py init
+python3 main.py remote start
+python3 main.py deploy spark-examples_2.12-3.0.1.jar \
+org.apache.spark.examples.SparkPi \
+--args "10"
 ```

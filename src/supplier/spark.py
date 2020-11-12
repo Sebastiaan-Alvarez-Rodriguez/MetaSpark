@@ -12,7 +12,7 @@ from util.printer import *
 
 # Check if Spark is installed in deps/spark
 def spark_available():
-    return fs.isdir(loc.get_spark_dir()) and fs.isdir(loc.get_spark_sbin())
+    return fs.isdir(loc.get_spark_dir()) and fs.isdir(loc.get_spark_sbin_dir())
 
 
 #installs Spark
@@ -54,9 +54,3 @@ def install():
                 print(e)
                 printw('Could not extract archive. Retrying...')
     return False
-
-
-
-
-
-

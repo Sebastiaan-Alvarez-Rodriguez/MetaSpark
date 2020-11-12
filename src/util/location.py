@@ -53,6 +53,11 @@ def get_remote_metaspark_parent_dir():
 def get_remote_metaspark_dir():
     return fs.join(get_remote_metaspark_parent_dir(), fs.basename(fs.abspath()))
 
+def get_remote_metaspark_conf_dir():
+    return fs.join(get_remote_metaspark_dir(), 'conf')
+
+def get_remote_metaspark_jar_dir():
+    return fs.join(get_remote_metaspark_dir(), 'jars')
 
 #################### Node directories ####################
 # Because we  will use client logging using plan 2, this should change

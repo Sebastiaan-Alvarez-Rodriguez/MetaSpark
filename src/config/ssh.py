@@ -24,9 +24,9 @@ def ask_ssh_user_name():
 def ask_remote_metaspark_dir(default_dir=None):
     q = '''
 In which directory to install metaspark on the remote machine (e.g. /some/path)?
-Note: We place a directory named "metaspark" inside of the directory you pick here.
+Note: We place a directory named "MetaSpark" inside of the directory you pick here.
 Note: This directory you choose MUST be accessible by all nodes we might spawn
-on the remote. Recommendation: /var/scratch/<some_dir>
+on the remote. Recommendation: /var/scratch/<UserName>
 '''
     if default_dir != None:
         val = ui.ask_string(q+'Leave empty for default {}...'.format(default), empty_ok=True)  
@@ -97,6 +97,7 @@ def validate_settings(configloc):
     d['SSH'] = {'key_name', 'user', 'metaspark_dir'}
 
     parser = configparser.ConfigParser()
+    parser.optionxform=str
     parser.read(configloc)
     for key in d:
         if not key in parser:

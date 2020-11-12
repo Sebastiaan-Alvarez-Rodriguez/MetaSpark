@@ -48,8 +48,9 @@ def clean():
 # Handles execution on the remote main node, before booting the cluster
 def exec(time_to_reserve, config_filename, debug_mode):
     print('Connected! Using cluster configuration "{}"'.format(config_filename))
-    cluster_cfg = clr.load_cluster_config(config_filename)
-
+    cluster_cfg = clr.get_or_create_cluster_config(config_filename)
+    if not cluster_cfg:
+        return False
 
     nodes = cluster_cfg.nodes + 1 # We always want 1 node for the spark master alone
     if cluster_cfg.coallocation_affinity > 1:
@@ -80,20 +81,18 @@ Spawning {} nodes instead to service your request!
 
     print('Booting network...')
     
-    # 'echo $RESERVATION > reservation_no'
-    # preserve -1  -np $NODES -t 2:00:00  | grep "Reservation number" | awk '{ print $3 }' | sed 's/://'`
-    # 'prun -np {} -{} -t {} python3 {} --exec_internal {} {}'.format(nodes, affinity, time_to_reserve, fs.join(fs.abspath(), 'main.py'), config_filename, '-d' if debug_mode else '')
-
+    port = 7077
     # Boot master first
-    status = rmt.boot_master(reserver.deployment.nodes[0], debug_mode=debug_mode)
+    status = rmt.boot_master(reserver.deployment.master_ip, port=port, debug_mode=debug_mode)
     if not status:
         return False
 
     time.sleep(5) #Give master deamon a head start
 
     # Boot all slaves in parallel
-    status = rmt.boot_slaves(reserver.deployment.nodes[1:], reserver.deployment.nodes[0], debug_mode=debug_mode)
+    status = rmt.boot_slaves(reserver.deployment.slave_ips, reserver.deployment.master_ip, master_port=port, debug_mode=debug_mode)
     
+    reserver.deployment.master_port = port
     # Persists reservation info (reservation number, nodes)
     reserver.persist()
     
@@ -106,7 +105,7 @@ Spawning {} nodes instead to service your request!
 # Handles export commandline argument
 def export(full_exp=False):
     print('Copying files using "{}" strategy, using key "{}"...'.format('full' if full_exp else 'fast', metacfg.ssh.ssh_key_name))
-    command = 'rsync -az {} {}:{}'.format(fs.abspath(),metacfg.ssh.ssh_key_name,loc.get_remote_metaspark_parent_dir())
+    command = 'rsync -az {} {}:{}'.format(fs.abspath(), metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_parent_dir())
     if full_exp:
         command+= ' --exclude '+' --exclude '.join([
             '.git',
@@ -148,8 +147,8 @@ def init():
     if not export(full_exp=True):
         printe('Unable to export to DAS5 remote using user/ssh-key "{}"'.format(metacfg.ssh_key_name))
         return False
-    if os.system('ssh {} "python3 {}/main.py --init_internal"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir())) == 0:
-        prints('Completed MetaSpark initialization. Use "{} --remote" to start execution on the remote host'.format(sys.argv[0]))
+    if os.system('ssh {} "python3 {}/main.py init --internal"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir())) == 0:
+        prints('Completed MetaSpark initialization. Use "{} remote start" to start execution on the remote host'.format(sys.argv[0]))
     else:
         printe('Something went wrong with MetaSpark initialization (see above). Please fix the problems and try again!')
 
@@ -160,33 +159,28 @@ def remote_start(time_to_reserve, config_filename, debug_mode, force_exp):
         printe('Could not export data')
         return False
 
-    if len(config_filename) == 0: #user did not provide config, so ask for it
-        config, should_export = clr.get_cluster_config()
-        config_filename = fs.basename(config.path)
-        if should_export:
-            export(full_exp=False) #Export potential new config
-    else:
-        if not fs.isfile(loc.get_metaspark_cluster_conf_dir(), config_filename):
-            printe('Provided config "{}" does not exist!'.format(fs.join(loc.get_metaspark_cluster_conf_dir(), config_filename)))
-            return False
+    config = clr.get_or_create_cluster_config(config_filename)
+    if not config:
+        return False
 
-    program = '--exec {} -t {}'.format(config_filename, time_to_reserve) + (' -d' if debug_mode else '')
+    program = 'exec -c {} -t {}'.format(fs.basename(config.path), time_to_reserve) + (' -d' if debug_mode else '')
 
-    command = 'ssh {0} "python3 {1}/main.py {2}"'.format(
+    command = 'ssh {} "python3 {}/main.py {}"'.format(
         metacfg.ssh.ssh_key_name,
         loc.get_remote_metaspark_dir(),
         program)
-    print('Connecting using key "{0}"...'.format(metacfg.ssh.ssh_key_name))
+    print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
     return os.system(command) == 0
+
 
 # Stop the remote cluster, if any is running
 def remote_stop():
-    program = '--stop'
-    command = 'ssh {0} "python3 {1}/main.py {2}"'.format(
+    program = 'stop'
+    command = 'ssh {} "python3 {}/main.py {}"'.format(
         metacfg.ssh.ssh_key_name,
         loc.get_remote_metaspark_dir(),
         program)
-    print('Connecting using key "{0}"...'.format(metacfg.ssh.ssh_key_name))
+    print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
     return os.system(command) == 0
 
 
@@ -215,47 +209,59 @@ def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     subparsers = parser.add_subparsers(help='Subcommands', dest='command')
     deploy.subparser(subparsers)
+    checkparser = subparsers.add_parser('check', help='check whether environment has correct tools')
+    
+    execparser = subparsers.add_parser('exec', help='call this on the DAS5 to handle server orchestration')
+    execparser.add_argument('-c', '--clusterconfig', metavar='config', type=str, help='Cluster config filename to use for execution')
+    execparser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
+    execparser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
+    execparser.add_argument('--internal', nargs=1, type=str, help=argparse.SUPPRESS)
 
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--check', help='check whether environment has correct tools', action='store_true')
-    group.add_argument('--exec_internal', nargs=1, metavar='cluster_config', type=str, help=argparse.SUPPRESS)
-    group.add_argument('--exec', nargs=1, metavar='cluster_config', type=str, help='call this on the DAS5 to handle server orchestration')
-    group.add_argument('--export', help='export only metaspark and script code to the DAS5', action='store_true')
-    group.add_argument('--init_internal', help=argparse.SUPPRESS, action='store_true')
-    group.add_argument('--init', help='Initialize MetaSpark to run code on the DAS5', action='store_true')
-    group.add_argument('--remote-start', dest='remote_start', nargs='?', metavar='cluster_config', type=str, help='execute code on the DAS5 from your local machine')
-    group.add_argument('--remote-stop', dest='remote_stop', help='Stop cluster on DAS5 from your local machine', action='store_true')
-    group.add_argument('--settings', help='Change settings', action='store_true')
-    group.add_argument('--stop', help='Stop any cluster that currently runs on this machine', action='store_true')
-    parser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
-    parser.add_argument('-e', '--force-export', dest='force_exp', help='Forces to re-do the export phase', action='store_true')
-    parser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
+    exportparser = subparsers.add_parser('export', help='export only metaspark and script code to the DAS5')
+    
+    initparser = subparsers.add_parser('init', help='Initialize MetaSpark to run code on the DAS5')
+    initparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
+
+    remoteparser = subparsers.add_parser('remote', help='Start or stop a cluster running on the remote')
+    subsubparsers = remoteparser.add_subparsers(help='Subsubcommands', dest='subcommand')
+    remotestartparser = subsubparsers.add_parser('start', help='Start cluster on DAS5 from your local machine')
+    remotestartparser.add_argument('-c', '--clusterconfig', metavar='config', type=str, help='Cluster config filename to use for execution')
+    remotestartparser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
+    remotestartparser.add_argument('-e', '--force-export', dest='force_exp', help='Forces to re-do the export phase', action='store_true')
+    remotestartparser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
+    remotestopparser = subsubparsers.add_parser('stop', help='Stop cluster on DAS5 from your local machine')
+
+    settingsparser = subparsers.add_parser('settings', help='Change settings')
+    stopparser = subparsers.add_parser('stop',  help='Stop any cluster that currently runs on this machine')
+
     args = parser.parse_args()
 
     if deploy.deploy_args_set(args):
         return deploy.deploy(parser, args)
-    if args.check:
+    if args.command == 'check':
         check()
-    elif args.exec_internal:
-        _exec_internal(args.exec_internal[0], args.debug_mode)
-    elif args.exec:
-        exec(args.time_alloc, args.exec[0], args.debug_mode)
-    elif args.export:
+    elif args.command == 'exec' and args.internal:
+        _exec_internal(args.internal[0], args.debug_mode)
+    elif args.command == 'exec':
+        exec(args.time_alloc, args.clusterconfig, args.debug_mode)
+    elif args.command == 'export':
         export(full_exp=True)
-    elif args.init_internal:
+    elif args.command == 'init' and args.internal:
         _init_internal()
-    elif args.init:
+    elif args.command == 'init':
         init()
-    elif args.remote_start:
-        remote_start(args.time_alloc, args.remote_start, args.debug_mode, args.force_exp)
-    elif args.remote_stop:
-        remote_stop()
-    elif args.stop:
+    elif args.command == 'remote':
+        if args.subcommand=='start':
+            remote_start(args.time_alloc, args.clusterconfig, args.debug_mode, args.force_exp)
+        elif args.subcommand=='stop':
+            remote_stop()
+        else:
+            remoteparser.print_help()
+    elif args.command == 'stop':
         stop()
-    elif args.settings:
+    elif args.command == 'settings':
         settings()
-
-    if len(sys.argv) == 1:
+    else:
         parser.print_help()
 
 if __name__ == '__main__':

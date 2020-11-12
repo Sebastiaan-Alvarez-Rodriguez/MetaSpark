@@ -72,6 +72,7 @@ def validate_settings(configloc):
     d['Meta'] = {'ssh_config_name'}
     
     parser = configparser.ConfigParser()
+    parser.optionxform=str
     parser.read(configloc)
     for key in d:
         if not key in parser:
@@ -106,7 +107,7 @@ class MetaConfig(object):
         return self.parser['Meta']['ssh_config_name']
 
     @ssh_config_name.setter
-    def set_ssh_config_name(self, val):
+    def ssh_config_name(self, val):
         self._ssh = ssh.SSHConfig(self.val)
 
     @property
@@ -121,6 +122,3 @@ class MetaConfig(object):
 
 # Import settings_instance if you wish to read Meta settings
 cfg_meta_instance = MetaConfig()
-
-# Import settings_instance if you wish to read SSH settings
-# cfg_ssh_instance = ssh.SSHConfig(cfg_meta_instance.ssh_config_name)
