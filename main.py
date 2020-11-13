@@ -71,7 +71,7 @@ Spawning {} nodes instead to service your request!
                 return False
     except Exception as e:
         pass
-    print('Booting cluster ({} nodes) for time: {}'.format(cluster_cfg.nodes, time_to_reserve))
+    print('Booting cluster ({} nodes) for time: {}'.format(nodes, time_to_reserve))
 
     reserver = Reserver()
     reserver.reserve(nodes, time_to_reserve)
@@ -111,7 +111,8 @@ def export(full_exp=False):
             '.git',
             '__pycache__',
             'results',
-            'graphs'])
+            'graphs',
+            'jars'])
         if not clean():
             printe('Cleaning failed')
             return False
@@ -122,7 +123,8 @@ def export(full_exp=False):
             '__pycache__',
             'results', 
             'graphs',
-            'deps'])
+            'deps',
+            'jars'])
     if os.system(command) == 0:
         prints('Export success!')
         return True

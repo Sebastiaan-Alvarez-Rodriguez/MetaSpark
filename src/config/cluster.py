@@ -141,6 +141,8 @@ def get_or_create_cluster_config(config_filename=None):
             export_configs() # Export new config
         return config
     else: # user provided a config, load it
+        if not config_filename.endswith('.cfg'):
+            config_filename += '.cfg'
         if fs.isfile(loc.get_metaspark_cluster_conf_dir(), config_filename):
             return load_cluster_config(config_filename)
         else:
