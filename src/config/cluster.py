@@ -16,8 +16,8 @@ def ask_nodes():
 def ask_affinity(nodes):
     while True:
         ans = ui.ask_int('How many worker processes to launch per worker node in the cluster? (must be divisible by #nodes ({}))'.format(nodes))
-        if ans % nodes != 0:
-            printe('{0} is not divisible by {1} ({0}%{1}={2})'.format(ans, nodes, ans % nodes))
+        if nodes % ans != 0:
+            printe('{0} is not divisible by {1} ({1}%{0}={2})'.format(ans, nodes, nodes%ans))
         else:
             return ans
 
