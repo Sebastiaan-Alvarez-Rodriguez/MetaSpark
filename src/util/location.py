@@ -9,8 +9,8 @@ from config.meta import cfg_meta_instance as metacfg
 def get_metaspark_dep_dir():
     return fs.join(fs.abspath(), 'deps')
 
-def get_metaspark_experiment_dir():
-    return fs.join(fs.abspath(), 'experiments')
+def get_metaspark_data_dir():
+    return fs.join(fs.abspath(), 'data')
 
 def get_metaspark_results_dir():
     return fs.join(fs.abspath(), 'results')
@@ -59,7 +59,14 @@ def get_remote_metaspark_conf_dir():
 def get_remote_metaspark_jar_dir():
     return fs.join(get_remote_metaspark_dir(), 'jars')
 
+def get_remote_metaspark_data_dir():
+    return fs.join(get_remote_metaspark_dir(), 'data')
+
 #################### Node directories ####################
-# Because we  will use client logging using plan 2, this should change
+# Because we will use client logging using plan 2, this should change
 def get_node_local_dir():
     return '/local/{}/'.format(metacfg.ssh.ssh_user_name)
+
+# What is faster than a local dir? That's right, a local dir mapped on an ssd!
+def get_node_local_ssd_dir():
+    return '/local-ssd/{}/'.format(metacfg.ssh.ssh_user_name)
