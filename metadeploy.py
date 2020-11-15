@@ -90,10 +90,12 @@ def finished(partition, extension, amount, kind, rb):
     if partition == 32 and extension == 'pq' and amount == 10000:
         if kind == 'rdd':
             return True
-        if kind == 'df' and rb < 20480*16:
+        if kind == 'df' and rb <= 20480*8:
             return True
     if partition == 16 and extension == 'pq' and amount == 10000:
-        if kind == 'rdd' and rb == 20480:
+        if kind == 'rdd' or kind == 'df':
+            return True
+        if kind == 'ds' and rb <= 20480*2:
             return True
     if partition == 4 and extension == 'pq' and amount == 10000:
         if kind == 'rdd' and rb == 20480:
@@ -104,32 +106,32 @@ def main():
     eprint('Ready to deploy!')
     partitions = [16, 8, 4, 32]
     rbs = [20480, 20480*2, 20480*4, 20480*8, 20480*16]
-    amounts = [10000, 100000, 1000000, 10000000, 100000000]
+    amounts = [100000, 1000000, 10000000, 100000000, 10000]
     extensions = ['pq', 'csv']
-    kinds = ['rdd', 'df', 'df_sql', 'ds']
+    kinds = ['rdd', 'df', 'ds'] #'df_sql' is off until fixed!
 
-    for extension in extensions:
-        for partition in partitions:
-            stop_cluster()
-            if not start_cluster(partition):
-                return False
-            else:
-                time.sleep(10) #Give slaves time to connect to master        
-            for amount in amounts:
-                for kind in kinds:
-                    for rb in rbs:
+    for rb in rbs:
+        for extension in extensions:
+            for partition in partitions:
+                stop_cluster()
+                if not start_cluster(partition):
+                    return False
+                else:
+                    time.sleep(10) #Give slaves time to connect to master        
+                for amount in amounts:
+                    for kind in kinds:
                         if finished(partition, extension, amount, kind, rb):
                             continue
                         progruns = 100
                         runs = 2*progruns
-                        outputloc = '/var/scratch/hpcl1910/{}.{}.{}.{}.{}.res'.format(partition, extension, amount, kind, rb)
+                        outputloc = '/var/scratch/hpcl1910/{0}/{1}/{2}/{3}/{0}.{1}.{2}.{3}.{4}.res'.format(partition, extension, amount, kind, rb)
                         for x in range(3):
                             start_application(outputloc, partition, extension, amount, kind, rb, progruns)
                             if block_until_done_or_dead(outputloc, runs):
                                 break # We are done!
                             else: #We died. Do remaining runs
                                 finished_runs = check_runs(outputloc)
-                                progruns -= (finished_runs/2) + 1 + (1 if finished_runs %2 != 0 else 0) #+1 for removing initial run, +1 for if we have an uneven amount
+                                progruns -= (finished_runs//2) + 1 + (1 if finished_runs %2 != 0 else 0) #+1 for removing initial run, +1 for if we have an uneven amount
                                 runs = 2*progruns
                                 outputloc += '_'+str(x)
                             if x == 2:

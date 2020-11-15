@@ -19,9 +19,19 @@ import util.ui as ui
 # Register 'deploy' subparser modules
 def subparser(subparsers):
     resultparser = subparsers.add_parser('results', help='Create result graphs/statistics')
-    group = resultparser.add_mutually_exclusive_group()
-    group.add_argument('--stats', help='Compute and display basic statistics')
-    group.add_argument('--graph', nargs=1, metavar='partitions', help='Build graph for results in /results/<partitions>')
+    subsubparsers = resultparser.add_subparsers(help='Subsubcommands', dest='subcommand')
+    filterparser = subsubparsers.add_parser('filter', help='Display generic info, based on filters')
+    subsubsubparsers = filterparser.add_subparsers(help='Subsubsubcommands', dest='subsubcommand')
+    filtergenericparser = subsubparsers.add_parser('generic', help='Print generic info, using filters')
+    filternormalparser = subsubparsers.add_parser('normal', help='Print normal info, using filters')
+
+    filterparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partition filters')
+    filterparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
+    filterparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
+    filterparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
+    filterparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Reeadbuffer filters')
+
+    resultparser.add_argument('data', help='Location of data!', type=str)
     resultparser.add_argument('-l', '--large', help='Forces to generate large graphs, with large text', action='store_true')
     resultparser.add_argument('-ns', '--no-show', dest='no_show', help='Do not show generated graph (useful on servers without xorg forwarding)', action='store_true')
     resultparser.add_argument('-s', '--store', help='Store generated graph (in /metazoo/graphs/<graph_name>/<timestamp>.<type>)', action='store_true')
@@ -55,14 +65,10 @@ def results(parser, args):
 
     if not fs.isdir(loc.get_metaspark_results_dir()):
         printe('[FAILURE] You have no experiment results directory "{}". Run experiments to get some data first.'.format(log.get_metaspark_results_dir()))
-    fargs = [args.large, args.no_show, args.store, args.type]
-    
-    if args.stats:
-        import result.stats.gen as gen
-        gen.stats(args.stats, *fargs)
-    elif args.graph:
-        return
-        import result.throughput.gen as kgen
-        kgen.throughput(args.throughput[0], *fargs)
+    fargs = [args.data, args.large, args.no_show, args.store, args.type]
+
+    if args.subcommand == 'filter':
+        import result.filter.generic as f
+        f.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer)
     else:
         parser.print_help()

@@ -1,11 +1,11 @@
 # This file contains a fast log reader for increasing log numbers
-
+import numpy as np
 
 import util.fs as fs
 from util.printer import *
 
-def _match(val, nullable=None):
-    return True if nullable == None else val == str(nullable)
+def _match(val, nullable_arr=None):
+    return True if nullable_arr == None or len(nullable_arr) == 0 else str(val) in nullable_arr
 
 def filename_to_rb(filename):
     return int(filename.split('.')[-2])
@@ -57,24 +57,92 @@ class Reader(object):
             with open(file, 'r') as f:
                 identifiers = fs.dirname(file).split(fs.sep())[-4:] + [filename_to_rb(file)]
                 yield Frame(*identifiers, f.readlines())
+
     @property
     def num_files(self):
         return len(self.files) if self.files else 0
 
+
 class Frame(object):
-    '''Frames are holders of data, with identifiers'''
+    '''Frames hold data in numpy arrays, with identifiers'''
     def __init__(self, partition, extension, amount, kind, rb, lines):
         if len(lines) % 2 != 0:
             raise RuntimeError('File "{}" has uneven amount of lines!'.format(file))
-                
-        self.data = [self._prepare_data(x, y) for x, y in zip(lines[::2], lines[1::2])]
-        self.partition = partition
-        self.extension = extension
-        self.amount = amount
-        self.kind = kind
-        self.rb = rb
+        
+        dtimes = [int(x.split(', ')[0]) for x in lines]
+        ctimes = [int(x.split(', ')[1]) for x in lines]
+        answers= [int(x.split(', ')[2]) for x in lines]
 
-    def _prepare_data(self, line0, line1):
-        datatime0, computetime0, answer0 = line0.split(', ')
-        datatime1, computetime1, answer1 = line1.split(', ')
-        return int(datatime0), int(computetime0), int(answer0), int(datatime1), int(computetime1), int(answer1)
+        # Identifiers
+        self.partition = int(partition)
+        self.extension = extension
+        self.amount = int(amount)
+        self.kind = kind
+        self.rb = int(rb)
+
+        self.ds_d_arr = np.array(dtimes[::2])
+        self.spark_d_arr = np.array(dtimes[1::2])
+
+        self.ds_c_arr = np.array(ctimes[::2])
+        self.spark_c_arr = np.array(ctimes[1::2])
+        
+        self.ds_a_arr = np.array(answers[::2])
+        self.spark_a_arr = np.array(answers[1::2])
+    
+    @property
+    def ds_d_time(self):
+        return float(np.sum(self.ds_d_arr)) / 1000000000
+    
+    @property
+    def ds_c_time(self):
+        return float(np.sum(self.ds_c_arr)) / 1000000000
+    
+    @property
+    def ds_total_time(self):
+        return self.ds_d_time+self.ds_c_time
+    
+    @property
+    def spark_d_time(self):
+        return float(np.sum(self.spark_d_arr)) / 1000000000
+    
+    @property
+    def spark_c_time(self):
+        return float(np.sum(self.spark_c_arr)) / 1000000000
+    
+    @property
+    def spark_total_time(self):
+        return self.spark_d_time+self.spark_c_time
+    
+    @property
+    def ds_d_avgtime(self):
+        return np.average(self.ds_d_arr) / 1000000000
+        
+    @property
+    def ds_c_avgtime(self):
+        return np.average(self.ds_c_arr) / 1000000000
+    
+    @property
+    def ds_total_avgtime(self):
+        return self.ds_d_avgtime+self.ds_c_avgtime
+    
+    @property
+    def spark_d_avgtime(self):
+        return np.average(self.spark_d_arr) / 1000000000
+        
+    @property
+    def spark_c_avgtime(self):
+        return np.average(self.spark_c_arr) / 1000000000
+    
+    @property
+    def spark_total_avgtime(self):
+        return self.spark_d_avgtime+self.spark_c_avgtime
+    
+    @property
+    def ds_incorrect(self):
+        correct_ans = self.amount*(self.amount-1)/2
+        return len([x for x in self.ds_a_arr if x != correct_ans])
+
+    @property
+    def spark_incorrect(self):
+        correct_ans = self.amount*(self.amount-1)/2
+        return len([x for x in self.spark_a_arr if x != correct_ans])
