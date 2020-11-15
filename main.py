@@ -14,6 +14,7 @@ import config.cluster as clr
 import deploy.deploy as deploy
 import remote.remote as rmt
 from remote.reservation import Reserver
+import result.results as results
 import supplier.spark as spk
 import supplier.java as jv
 from util.executor import Executor
@@ -21,7 +22,6 @@ import util.location as loc
 import util.fs as fs
 import util.ui as ui
 from util.printer import *
-
 
 # Check if required tools (Java11, Scala12) are available
 def check(silent=False):
@@ -210,7 +210,8 @@ def stop(silent=False):
 def main():
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     subparsers = parser.add_subparsers(help='Subcommands', dest='command')
-    deploy.subparser(subparsers)
+    deployparser = deploy.subparser(subparsers)
+    resultparser = results.subparser(subparsers)
     checkparser = subparsers.add_parser('check', help='check whether environment has correct tools')
     
     execparser = subparsers.add_parser('exec', help='call this on the DAS5 to handle server orchestration')
@@ -239,7 +240,9 @@ def main():
     args = parser.parse_args()
 
     if deploy.deploy_args_set(args):
-        return deploy.deploy(parser, args)
+        return deploy.deploy(deployparser, args)
+    elif results.results_args_set(args):
+        return results.results(resultparser, args)
     if args.command == 'check':
         check()
     elif args.command == 'exec' and args.internal:

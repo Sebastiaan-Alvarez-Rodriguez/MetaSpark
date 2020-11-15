@@ -123,7 +123,7 @@ def subparser(subparsers):
     deployparser.add_argument('--jars', nargs='+', metavar='argument', help='Extra jars to pass along your jarfile')
     deployparser.add_argument('--opts', nargs='+', metavar='argument', help='Extra arguments to pass on to spark-submit')    
     deployparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
-
+    return deployparser
 
 # Return True if we found arguments used from this subparser, False otherwise
 # We use this to redirect command parse output to this file, deploy() function 
