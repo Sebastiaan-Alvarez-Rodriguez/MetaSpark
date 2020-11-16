@@ -7,8 +7,7 @@ import sys
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
-<<<<<<< HEAD
-=======
+
 def try_os_command(command, err=None):
     if err == None:
         err = 'OS problem occured with command'.format(command)
@@ -22,7 +21,7 @@ def try_os_command(command, err=None):
         time.sleep(5)
     return False
 
->>>>>>> reserve
+
 # Returns number of completed runs, or 0 if there was a problem
 def check_runs(das5_loc):
     command = 'wc -l {}'.format(das5_loc)
@@ -30,6 +29,7 @@ def check_runs(das5_loc):
         return int(subprocess.check_output(command, shell=True).decode('utf-8').split(' ')[0])
     except Exception as e:
         return 0
+
 
 # Like the name says: Blocks until we are done or dead.
 # Returns True if done, False if dead
@@ -52,24 +52,28 @@ def block_until_done_or_dead(das5_loc, runs):
             return False
         time.sleep(60)
 
+
 # Stop a cluster immediately
 def stop_cluster(): 
     return try_os_command('python3 /var/scratch/hpcl1910/MetaSpark/main.py stop', 'Big problem stopping cluster!')
 
 
 # Start a cluster with partition nodes
-def start_cluster(partition):
-    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py exec -c {}.cfg -t 08:00:00 -f'.format(partition)
+def start_cluster(partition, time):
+    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py exec -c {}.cfg -t {} -f -ni'.format(partition, time)
     if not try_os_command(command, 'Big problem starting cluster!'):
         return False
     command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py deploy data /var/scratch/hpcl1910/MetaSpark/*.pq --internal --skip'.format(partition)
     return try_os_command(command, 'Big problem distributing input data!')
+
 
 # Remove junk generated during each run
 def clean_junk():
     command = 'rm -rf /local-ssd/hpcl1910/work/ /var/scratch/hpcl1910/MetaSpark/deps/spark/work/ /var/scratch/hpcl1910/MetaSpark/deps/spark/logs/'
     os.system(command)
 
+
+# Start application for testing
 def start_application(outputloc, partition, extension, amount, kind, rb, progruns):
     clean_junk()
     command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py deploy application Hydro-1.0-all.jar experiments.Experimenter --internal --args "\
@@ -90,7 +94,7 @@ def start_application(outputloc, partition, extension, amount, kind, rb, progrun
 
 # Returns True if we already finished this one and should skip it, False otherwise
 def finished(partition, extension, amount, kind, rb):
-    return False
+    return os.path.exists('/var/scratch/hpcl1910/{0}/{1}/{2}/{3}/{0}.{1}.{2}.{3}.{4}.res'.format(partition, extension, amount, kind, rb))
 
     # nfs_old had below finished:
     # if partition == 32 and extension == 'pq' and amount == 10000:
@@ -112,33 +116,33 @@ def main():
     eprint('Ready to deploy!')
     partitions = [32, 16, 8, 4]
     rbs = [20480*8, 20480, 20480*2, 20480*4, 20480*16]
-    amounts = [10000, 100000, 1000000, 10000000, 100000000]
-    extensions = ['pq', 'csv']
+    amounts = [10000, 100000, 1000000, 10000000] #100000000 is off until evening runs
+    extensions = ['pq'] #'csv' is off until verified working
     kinds = ['rdd', 'df', 'ds'] #'df_sql' is off until fixed!
 
     for rb in rbs:
         for extension in extensions:
             for partition in partitions:
-                stop_cluster()
-                if not start_cluster(partition):
-                    return False
-                else:
-                    time.sleep(10) #Give slaves time to connect to master        
                 for amount in amounts:
                     for kind in kinds:
                         if finished(partition, extension, amount, kind, rb):
                             continue
-                        progruns = 100
-                        runs = 2*progruns
+                        progruns = 30
                         outputloc = '/var/scratch/hpcl1910/{0}/{1}/{2}/{3}/{0}.{1}.{2}.{3}.{4}.res'.format(partition, extension, amount, kind, rb)
                         for x in range(3):
+                            stop_cluster()
+                            if not start_cluster(partition, '15:00'):
+                                return False
+                            else:
+                                time.sleep(5) #Give slaves time to connect to master
+                            
                             start_application(outputloc, partition, extension, amount, kind, rb, progruns)
-                            if block_until_done_or_dead(outputloc, runs):
+                            
+                            if block_until_done_or_dead(outputloc, 2*progruns):
                                 break # We are done!
                             else: #We died. Do remaining runs
                                 finished_runs = check_runs(outputloc)
                                 progruns -= (finished_runs//2) + 1 + (1 if finished_runs %2 != 0 else 0) #+1 for removing initial run, +1 for if we have an uneven amount
-                                runs = 2*progruns
                                 outputloc += '_'+str(x)
                             if x == 2:
                                 eprint('\n\n!!!FATALITY!!! for {}\n\n'.format(outputloc))

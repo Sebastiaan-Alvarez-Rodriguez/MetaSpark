@@ -69,4 +69,5 @@ def get_node_local_dir():
 
 # What is faster than a local dir? That's right, a local dir mapped on an ssd!
 def get_node_local_ssd_dir():
-    return '/local-ssd/{}/'.format(metacfg.ssh.ssh_user_name)
+    return get_node_local_dir() # Somehow, they stopped write permission to local-ssd
+    # return '/local-ssd/{}/'.format(metacfg.ssh.ssh_user_name)

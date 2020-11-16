@@ -46,7 +46,7 @@ def clean():
 
 
 # Handles execution on the remote main node, before booting the cluster
-def exec(time_to_reserve, config_filename, debug_mode, fast):
+def exec(time_to_reserve, config_filename, debug_mode, fast, no_interact):
     print('Connected! Using cluster configuration "{}"'.format(config_filename))
     cluster_cfg = clr.get_or_create_cluster_config(config_filename)
     if not cluster_cfg:
@@ -64,11 +64,13 @@ Spawning {} nodes instead to service your request!
 
     try:
         reserver = Reserver.load()
-        if ui.ask_bool('Found active reservation. Kill it and spawn new (Y) or cancel (n)?'):
-            if reserver.stop():
-                prints('Stopped reservation successfully!')
-            else:
+        if no_interact:
+            reserver.stop()
+        else:
+            if not ui.ask_bool('Found active reservation. Kill it and spawn new (Y) or cancel (n)?'):
                 return False
+        if reserver.stop():
+            prints('Stopped reservation successfully!')
     except Exception as e:
         pass
     print('Booting cluster ({} nodes) for time: {}'.format(nodes, time_to_reserve))
@@ -138,11 +140,8 @@ def export(full_exp=False):
 def _init_internal():
     if (not jv.check_version()):
         print('Java not ready on remote!')
-        exit(1)
-    elif not spk.install():
-        exit(1)
-    else:
-        exit(0)
+        return False
+    return spk.install()
 
 
 # Handles init commandline argument
@@ -153,12 +152,13 @@ def init():
         return False
     if os.system('ssh {} "python3 {}/main.py init --internal"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir())) == 0:
         prints('Completed MetaSpark initialization. Use "{} remote start" to start execution on the remote host'.format(sys.argv[0]))
+        return True
     else:
         printe('Something went wrong with MetaSpark initialization (see above). Please fix the problems and try again!')
-
+    return False
 
 # Handles remote commandline argument
-def remote_start(time_to_reserve, config_filename, debug_mode, fast, force_exp):
+def remote_start(time_to_reserve, config_filename, debug_mode, fast, force_exp, no_interact):
     if force_exp and not export(full_exp=True):
         printe('Could not export data')
         return False
@@ -167,7 +167,7 @@ def remote_start(time_to_reserve, config_filename, debug_mode, fast, force_exp):
     if not config:
         return False
 
-    program = 'exec -c {} -t {}'.format(fs.basename(config.path), time_to_reserve)+(' -d' if debug_mode else '')+(' -f' if fast else '')
+    program = 'exec -c {} -t {}'.format(fs.basename(config.path), time_to_reserve)+(' -d' if debug_mode else '')+(' -f' if fast else '') + (' -ni' if no_interact else '')
 
     command = 'ssh {} "python3 {}/main.py {}"'.format(
         metacfg.ssh.ssh_key_name,
@@ -190,7 +190,7 @@ def remote_stop():
 
 # Redirects execution to settings.py, where user can change settings
 def settings():
-    metacfg.change_settings()
+    return metacfg.change_settings()
 
 # Stop cluster running here, if any is running
 def stop(silent=False):
@@ -207,6 +207,7 @@ def stop(silent=False):
         if not silent: print('No reservation found on remote')
     except Exception as e:
         if not silent: print('Reservation file found, no longer active')
+    return True
 
 # The main function of MetaSpark
 def main():
@@ -220,6 +221,7 @@ def main():
     execparser.add_argument('-c', '--clusterconfig', metavar='config', type=str, help='Cluster config filename to use for execution')
     execparser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
     execparser.add_argument('-f', '--fast', help='Use fast mode for cluster', action='store_true')
+    execparser.add_argument('-ni', '--no_interact', help='No more questions about running reservations. Just kill and boot.', action='store_true')
     execparser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
     execparser.add_argument('--internal', nargs=1, type=str, help=argparse.SUPPRESS)
 
@@ -235,6 +237,7 @@ def main():
     remotestartparser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
     remotestartparser.add_argument('-e', '--force-export', dest='force_exp', help='Forces to re-do the export phase', action='store_true')
     remotestartparser.add_argument('-f', '--fast', help='Use fast mode for cluster', action='store_true')
+    remotestartparser.add_argument('-ni', '--no_interact', help='No more questions about running reservations. Just kill and boot.', action='store_true')
     remotestartparser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
     
     remotestopparser = subsubparsers.add_parser('stop', help='Stop cluster on DAS5 from your local machine')
@@ -244,35 +247,38 @@ def main():
 
     args = parser.parse_args()
 
+
     if deploy.deploy_args_set(args):
-        return deploy.deploy(deployparsers, args)
+        retval = deploy.deploy(deployparsers, args)
     elif results.results_args_set(args):
-        return results.results(resultparser, args)
-    if args.command == 'check':
-        check()
+        retval = results.results(resultparser, args)
+    elif args.command == 'check':
+        retval = check()
     elif args.command == 'exec' and args.internal:
-        _exec_internal(args.internal[0], args.debug_mode)
+        retval = _exec_internal(args.internal[0], args.debug_mode)
     elif args.command == 'exec':
-        exec(args.time_alloc, args.clusterconfig, args.debug_mode, args.fast)
+        retval = exec(args.time_alloc, args.clusterconfig, args.debug_mode, args.fast, args.no_interact)
     elif args.command == 'export':
-        export(full_exp=True)
+        retval = export(full_exp=True)
     elif args.command == 'init' and args.internal:
-        _init_internal()
+        retval = _init_internal()
     elif args.command == 'init':
-        init()
+        retval = init()
     elif args.command == 'remote':
         if args.subcommand=='start':
-            remote_start(args.time_alloc, args.clusterconfig, args.debug_mode, args.fast, args.force_exp)
+            retval = remote_start(args.time_alloc, args.clusterconfig, args.debug_mode, args.fast, args.force_exp, args.no_interact)
         elif args.subcommand=='stop':
-            remote_stop()
+            retval = remote_stop()
         else:
             remoteparser.print_help()
     elif args.command == 'stop':
-        stop()
+        retval = retval = stop()
     elif args.command == 'settings':
-        settings()
+        retval = settings()
     else:
         parser.print_help()
+        exit(1)
+    exit(0 if retval else 1)
 
 if __name__ == '__main__':
     main()
