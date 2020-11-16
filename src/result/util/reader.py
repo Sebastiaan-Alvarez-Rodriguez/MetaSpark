@@ -67,7 +67,7 @@ class Frame(object):
     '''Frames hold data in numpy arrays, with identifiers'''
     def __init__(self, partition, extension, amount, kind, rb, lines):
         if len(lines) % 2 != 0:
-            raise RuntimeError('File "{}" has uneven amount of lines!'.format(file))
+            raise RuntimeError('File for "{}" has uneven amount of lines!'.format('{0}/{1}/{2}/{3}/{0}.{1}.{2}.{3}.{4}.res'.format(partition, extension, amount, kind, rb)))
         
         dtimes = [int(x.split(', ')[0]) for x in lines]
         ctimes = [int(x.split(', ')[1]) for x in lines]

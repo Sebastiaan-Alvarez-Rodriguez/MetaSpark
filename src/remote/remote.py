@@ -39,10 +39,11 @@ Provide
     master_node:    ip/hostname of master
     master_port:    port for master
     procs_per_node: Amount of slaves to spawn on this node
-    debug_mode:     True if we must print debug info, False otherwise
+    debug_mode:     True if we must print debug info, False otherwiseexecute
+    fast:           If True, sets slave work-dir on local SSD for more speed, uses slow NFS-mount otherwise
     execute:        Function executes built command and returns state_ok (another bool) if True, returns Executor if False
 '''
-def boot_slave(node, master_node, master_port=7077, debug_mode=False, execute=True):
+def boot_slave(node, master_node, master_port=7077, debug_mode=False, fast=False, execute=True):
     scriptloc = fs.join(loc.get_spark_sbin_dir(), 'start-slave.sh')
     master_url = 'spark://{}:{}'.format(master_node, master_port)
 
@@ -55,10 +56,11 @@ def boot_slave(node, master_node, master_port=7077, debug_mode=False, execute=Tr
 
     if debug_mode: print('Spawning worker on {}'.format(node))
 
-    cmd = 'ssh {} "{} {} {}"'.format(
+    cmd = 'ssh {} "{} {} {} {}"'.format(
             node,
             scriptloc,
             master_url,
+            '--work-dir {}'.format(loc.get_node_local_ssd_dir()) if fast else '',
             '> /dev/null 2>&1' if not debug_mode else ''
         )
 
@@ -80,11 +82,12 @@ Provide
     nodes:          ip/hostname list of nodes to boot workers on
     master_node:    ip/hostname of master
     master_port:    port for master
+    fast:           If True, sets slave work-dir on local SSD for more speed, uses slow NFS-mount otherwise
     debug_mode:     True if we must print debug info, False otherwise
 '''
-def boot_slaves(nodes, master_node, master_port=7077, debug_mode=False):
+def boot_slaves(nodes, master_node, master_port=7077, debug_mode=False, fast=False):
     executors = []
     for node in nodes:
-        executors.append(boot_slave(node, master_node, master_port=master_port, execute=False, debug_mode=debug_mode))
-    Executor.run_all(*executors)
-    return Executor.wait_all(*executors)
+        executors.append(boot_slave(node, master_node, master_port=master_port, fast=fast, debug_mode=debug_mode, execute=False))
+    Executor.run_all(executors)
+    return Executor.wait_all(executors)

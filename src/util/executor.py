@@ -55,7 +55,7 @@ class Executor(Synchronized):
 
     #  Function to run all given executors, with same arguments
     @staticmethod
-    def run_all(*executors):
+    def run_all(executors):
         for x in executors:
             x.run()
 
@@ -65,7 +65,7 @@ class Executor(Synchronized):
     Returns True if all processes sucessfully executed, False otherwise
     '''
     @staticmethod
-    def wait_all(*executors, stop_on_error=True):
+    def wait_all(executors, stop_on_error=True):
         status = True
         for x in executors:
             if x.wait() != 0:
@@ -79,7 +79,7 @@ class Executor(Synchronized):
     # Function to stop all given execuors.
     # If as_generator is True, we return exit status codes as a generator  
     @staticmethod
-    def stop_all(*executors, as_generator=False):
+    def stop_all(executors, as_generator=False):
         for x in executors:
             if as_generator:
                 yield x.stop()

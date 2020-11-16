@@ -7,6 +7,22 @@ import sys
 def eprint(*args, **kwargs):
     print(*args, file=sys.stderr, **kwargs)
 
+<<<<<<< HEAD
+=======
+def try_os_command(command, err=None):
+    if err == None:
+        err = 'OS problem occured with command'.format(command)
+    for x in range(5):
+        try:
+            if os.system(command) == 0:
+                return True
+        except Exception as e:
+            if x == 4:
+                eprint('{}: {}'.format(err, e))
+        time.sleep(5)
+    return False
+
+>>>>>>> reserve
 # Returns number of completed runs, or 0 if there was a problem
 def check_runs(das5_loc):
     command = 'wc -l {}'.format(das5_loc)
@@ -37,41 +53,28 @@ def block_until_done_or_dead(das5_loc, runs):
         time.sleep(60)
 
 # Stop a cluster immediately
-def stop_cluster():
-    for x in range(5):
-        try:
-            if os.system('python3 /var/scratch/hpcl1910/MetaSpark/main.py stop') == 0:
-                return True
-        except Exception as e:
-            if x == 4:
-                eprint('Big problem stopping cluster: {}'.format(e))
-        time.sleep(5)
-    return False
+def stop_cluster(): 
+    return try_os_command('python3 /var/scratch/hpcl1910/MetaSpark/main.py stop', 'Big problem stopping cluster!')
+
 
 # Start a cluster with partition nodes
 def start_cluster(partition):
-    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py exec -c {}.cfg -t 08:00:00'.format(partition)
-    for x in range(5):
-        try:
-            if os.system(command) == 0:
-                return True
-        except Exception as e:
-            if x == 4:
-                eprint('Big problem starting cluster: {}'.format(e))
-        time.sleep(5)
-    return False
+    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py exec -c {}.cfg -t 08:00:00 -f'.format(partition)
+    if not try_os_command(command, 'Big problem starting cluster!'):
+        return False
+    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py deploy data /var/scratch/hpcl1910/MetaSpark/*.pq --internal --skip'.format(partition)
+    return try_os_command(command, 'Big problem distributing input data!')
 
 # Remove junk generated during each run
 def clean_junk():
-    command = 'rm -rf /var/scratch/hpcl1910/MetaSpark/deps/spark/work/ /var/scratch/hpcl1910/MetaSpark/deps/spark/logs/'
+    command = 'rm -rf /local-ssd/hpcl1910/work/ /var/scratch/hpcl1910/MetaSpark/deps/spark/work/ /var/scratch/hpcl1910/MetaSpark/deps/spark/logs/'
     os.system(command)
-
 
 def start_application(outputloc, partition, extension, amount, kind, rb, progruns):
     clean_junk()
-    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py deploy Hydro-1.0-all.jar experiments.Experimenter --internal --args "\
+    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py deploy application Hydro-1.0-all.jar experiments.Experimenter --internal --args "\
     {} -nr {} -np {} -r {} -rb {} \
-    -p /var/scratch/hpcl1910/{}.{}" \
+    -p [[DATADIR]]/{}.{}" \
     --opts "--conf \'spark.executor.extraJavaOptions=-Dfile={}\' \
     --conf \'spark.driver.extraJavaOptions=-Dfile={}\'"'.format(
         kind, amount, partition, progruns, rb, amount, extension, outputloc, outputloc)
@@ -87,26 +90,29 @@ def start_application(outputloc, partition, extension, amount, kind, rb, progrun
 
 # Returns True if we already finished this one and should skip it, False otherwise
 def finished(partition, extension, amount, kind, rb):
-    if partition == 32 and extension == 'pq' and amount == 10000:
-        if kind == 'rdd':
-            return True
-        if kind == 'df' and rb <= 20480*8:
-            return True
-    if partition == 16 and extension == 'pq' and amount == 10000:
-        if kind == 'rdd' or kind == 'df':
-            return True
-        if kind == 'ds' and rb <= 20480*2:
-            return True
-    if partition == 4 and extension == 'pq' and amount == 10000:
-        if kind == 'rdd' and rb == 20480:
-            return True
     return False
+
+    # nfs_old had below finished:
+    # if partition == 32 and extension == 'pq' and amount == 10000:
+    #     if kind == 'rdd':
+    #         return True
+    #     if kind == 'df' and rb <= 20480*8:
+    #         return True
+    # if partition == 16 and extension == 'pq' and amount == 10000:
+    #     if kind == 'rdd' or kind == 'df':
+    #         return True
+    #     if kind == 'ds' and rb <= 20480*2:
+    #         return True
+    # if partition == 4 and extension == 'pq' and amount == 10000:
+    #     if kind == 'rdd' and rb == 20480:
+    #         return True
+    # return False
 
 def main():
     eprint('Ready to deploy!')
-    partitions = [16, 8, 4, 32]
-    rbs = [20480, 20480*2, 20480*4, 20480*8, 20480*16]
-    amounts = [100000, 1000000, 10000000, 100000000, 10000]
+    partitions = [32, 16, 8, 4]
+    rbs = [20480*8, 20480, 20480*2, 20480*4, 20480*16]
+    amounts = [10000, 100000, 1000000, 10000000, 100000000]
     extensions = ['pq', 'csv']
     kinds = ['rdd', 'df', 'ds'] #'df_sql' is off until fixed!
 
@@ -135,8 +141,8 @@ def main():
                                 runs = 2*progruns
                                 outputloc += '_'+str(x)
                             if x == 2:
-                                eprint('\n\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!FATALITY!!! for {}\n\n'.format(outputloc))
-                                print('\n\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!FATALITY!!! for {}\n\n'.format(outputloc))
+                                eprint('\n\n!!!FATALITY!!! for {}\n\n'.format(outputloc))
+                                print('\n\n!!!FATALITY!!! for {}\n\n'.format(outputloc))
 
 
 if __name__ == '__main__':

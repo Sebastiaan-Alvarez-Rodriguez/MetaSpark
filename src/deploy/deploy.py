@@ -2,6 +2,7 @@
 # as well as actual deployment.
 
 import argparse
+import glob
 import os
 import socket
 
@@ -15,9 +16,12 @@ from util.printer import *
 import util.time as tm
 import util.ui as ui
 
+def _args_replace(args, timestamp):
+    tmp1 = args.replace('[[RESULTDIR]]', fs.join(loc.get_metaspark_results_dir(), timestamp))
+    return tmp1.replace('[[DATADIR]]', loc.get_node_local_ssd_dir())
 
-# Deployment execution on remote
-def _deploy_internal(jarfile, mainclass, args, extra_jars, submit_opts):
+
+def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_opts):
     print('Connected!')
     scriptloc = fs.join(loc.get_spark_bin_dir(), 'spark-submit')
 
@@ -38,19 +42,13 @@ def _deploy_internal(jarfile, mainclass, args, extra_jars, submit_opts):
         fs.join(loc.get_metaspark_log4j_conf_dir(),'driver_log4j.properties'),
         fs.join(loc.get_metaspark_results_dir(), timestamp, 'spark.log'))
 
-    args = args.replace('[[RESULTDIR]]', fs.join(loc.get_metaspark_results_dir(), timestamp))
-    submit_opts = submit_opts.replace('[[RESULTDIR]]', fs.join(loc.get_metaspark_results_dir(), timestamp))
+    args = _args_replace(args, timestamp)
+    submit_opts = _args_replace(submit_opts, timestamp)
 
     print('Output log can be found at {}'.format(fs.join(loc.get_metaspark_results_dir(), timestamp)))
 
     if len(extra_jars) > 0:
         extra_jars = ','.join([fs.join(loc.get_metaspark_jar_dir(), x) for x in extra_jars.split(' ')])+','
-    # extra_jars += fs.join(loc.get_metaspark_jar_dir(), jarfile)
-    # TODO: Is this correct? 
-    #  Option 1: https://stackoverflow.com/questions/37887168/how-to-pass-environment-variables-to-spark-driver-in-cluster-mode-with-spark-sub
-    #  Option 2 (current): https://intellipaat.com/community/6625/how-to-pass-d-parameter-or-environment-variable-to-spark-job
-    #  Option 3: https://stackoverflow.com/questions/46564970/log4j2-store-and-use-variables-lookup-values
-    # Might use environment trick... However, it is not easy to have environment changes flow to allocated nodes!
     command = '{}\
     --driver-java-options "{}" \
     --class {} \
@@ -78,7 +76,8 @@ def _deploy_internal(jarfile, mainclass, args, extra_jars, submit_opts):
         printe('There were errors during deployment.')
     return status
 
-def _deploy(jarfile, mainclass, args, extra_jars, submit_opts):
+
+def _deploy_application(jarfile, mainclass, args, extra_jars, submit_opts):
     fs.mkdir(loc.get_metaspark_jar_dir(), exist_ok=True)
     if not fs.isfile(loc.get_metaspark_jar_dir(), jarfile):
         printw('Provided jarfile "{}" not found at "{}"'.format(jarfile, loc.get_metaspark_jar_dir()))
@@ -94,9 +93,7 @@ def _deploy(jarfile, mainclass, args, extra_jars, submit_opts):
 
     print('Synchronizing jars to server...')
     command = 'rsync -az {} {}:{}'.format(loc.get_metaspark_jar_dir(), metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir())
-    command+= ' --exclude '+' --exclude '.join([
-        '.git',
-        '__pycache__'])
+    command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__'])
     if os.system(command) == 0:
         prints('Export success!')
     else:
@@ -106,7 +103,7 @@ def _deploy(jarfile, mainclass, args, extra_jars, submit_opts):
     program = '{} {} --internal --args \'{}\' --jars \'{}\' --opts \'{}\''.format(
         jarfile, mainclass, args, extra_jars, submit_opts)
 
-    command = 'ssh {} "python3 {}/main.py deploy {}"'.format(
+    command = 'ssh {} "python3 {}/main.py deploy application {}"'.format(
     metacfg.ssh.ssh_key_name,
     loc.get_remote_metaspark_dir(),
     program)
@@ -114,16 +111,79 @@ def _deploy(jarfile, mainclass, args, extra_jars, submit_opts):
     return os.system(command) == 0
 
 
+def _deploy_data_internal(datalist, skip):
+    print('Synchronizing data to local nodes...')
+    data = ' '.join([fs.join(loc.get_metaspark_data_dir(), fs.basename(x)) for x in datalist])
+    try:
+        reserver = Reserver.load()
+    except FileNotFoundError as e:
+        printe('No reservation found on remote. Cannot run!')
+        return False
+    except Exception as e:
+        printe('Reservation file found, no longer active')
+        return False
+    executors = []
+    for host in reserver.deployment.nodes:
+        command = 'rsync -az {} {}:{}'.format(data, host, loc.get_node_local_ssd_dir())
+        command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__'])
+        if skip:
+            command+= '--ignore-existing'
+        executors.append(Executor(command, shell=True))
+    Executor.run_all(executors)
+    state = Executor.wait_all(executors, stop_on_error=False)
+    if state:
+        prints('Export success!')
+    else:
+        printe('Export failure!')
+    return state
+    
+
+def _deploy_data(datalist, skip):
+    for location in datalist:
+        glob_locs = glob.glob(location)
+        for glob_loc in glob_locs:
+            if not fs.exists(glob_loc):
+                printe('Path "{}" does not exist'.format(glob_loc))
+                return False
+    
+    print('Synchronizing data to server...')
+    data = ' '.join(datalist)
+    command = 'rsync -az {} {}:{}'.format(data, metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_data_dir())
+    command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__'])
+    if skip:
+        command+= '--ignore-existing'
+    if os.system(command) == 0:
+        print('Export success!')
+    else:
+        printe('Export failure!')
+        return False
+    
+    program = '{} --internal {}'.format(data, '--skip' if skip else '')
+    command = 'ssh {} "python3 {}/main.py deploy data {}"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir(), program)
+    print('TMP: command: {}'.format(command))
+    print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
+    return os.system(command) == 0
+
+
 # Register 'deploy' subparser modules
 def subparser(subparsers):
-    deployparser = subparsers.add_parser('deploy', help='Deploy applications (use deploy -h to see more...)')
-    deployparser.add_argument('jarfile', help='Jarfile to deploy')
-    deployparser.add_argument('mainclass', help='Main class of jarfile')
-    deployparser.add_argument('--args', nargs='+', metavar='argument', help='Arguments to pass on to your jarfile')
-    deployparser.add_argument('--jars', nargs='+', metavar='argument', help='Extra jars to pass along your jarfile')
-    deployparser.add_argument('--opts', nargs='+', metavar='argument', help='Extra arguments to pass on to spark-submit')    
-    deployparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
-    return deployparser
+    deployparser = subparsers.add_parser('deploy', help='Deploy applications/data (use deploy -h to see more...)')
+    subsubparsers = deployparser.add_subparsers(help='Subsubcommands', dest='subcommand')
+    
+    deployapplparser = subsubparsers.add_parser('application', help='Deploy applications (use deploy start -h to see more...)')
+    deployapplparser.add_argument('jarfile', help='Jarfile to deploy')
+    deployapplparser.add_argument('mainclass', help='Main class of jarfile')
+    deployapplparser.add_argument('--args', nargs='+', metavar='argument', help='Arguments to pass on to your jarfile')
+    deployapplparser.add_argument('--jars', nargs='+', metavar='argument', help='Extra jars to pass along your jarfile')
+    deployapplparser.add_argument('--opts', nargs='+', metavar='argument', help='Extra arguments to pass on to spark-submit')    
+    deployapplparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
+
+    deploydataparser = subsubparsers.add_parser('data', help='Deploy data (use deploy start -h to see more...)')
+    deploydataparser.add_argument('data', nargs='+', metavar='file', help='Files to place on reserved nodes local drive')
+    deploydataparser.add_argument('--skip', help='Skip data if already found on remote', action='store_true')
+    deploydataparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
+    return deployparser, deployapplparser, deploydataparser
+
 
 # Return True if we found arguments used from this subparser, False otherwise
 # We use this to redirect command parse output to this file, deploy() function 
@@ -132,15 +192,19 @@ def deploy_args_set(args):
 
 
 # Processing of deploy commandline args occurs here
-def deploy(parser, args):
-    jarfile = args.jarfile
-    mainclass = args.mainclass
-    jargs = ' '.join(args.args) if args.args != None else ''
-    extra_jars = ' '.join(args.jars) if args.jars != None else ''
-
-    submit_opts = ' '.join(args.opts) if args.opts != None else ''
-
-    if args.internal:
-        return _deploy_internal(jarfile, mainclass, jargs, extra_jars, submit_opts)
-    else:
-        return _deploy(jarfile, mainclass, jargs, extra_jars, submit_opts)
+def deploy(parsers, args):
+    if args.subcommand == 'application':
+        jarfile = args.jarfile
+        mainclass = args.mainclass
+        jargs = ' '.join(args.args) if args.args != None else ''
+        extra_jars = ' '.join(args.jars) if args.jars != None else ''
+        submit_opts = ' '.join(args.opts) if args.opts != None else ''
+        if args.internal:
+            return _deploy_application_internal(jarfile, mainclass, jargs, extra_jars, submit_opts)
+        else:
+            return _deploy_application(jarfile, mainclass, jargs, extra_jars, submit_opts)
+    elif args.subcommand == 'data':
+        if args.internal:
+            return _deploy_data_internal(args.data, args.skip)
+        else:
+            return _deploy_data(args.data, args.skip)
