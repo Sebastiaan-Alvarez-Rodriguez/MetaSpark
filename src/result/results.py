@@ -19,10 +19,16 @@ def filename_to_rb(filename):
     return int(filename.split('.')[-2])
 
 # Merge continuation files (e.g. x.res_0 is cont. file for x.res)
-def merge(data):
+def merge(data, skip_initial=True):
     def file_append(source, target):
         with open(source, 'r') as s:
             with open(target, 'a') as t:
+                if skip_initial:
+                    try:
+                        next(s)
+                        next(s)
+                    except StopIteration as e:
+                        return
                 while True:
                     data = s.read(65536)
                     if data:
@@ -51,24 +57,37 @@ def merge(data):
     prints('Merged {} files {}'.format(merges, '(all clean)' if merges == 0 else ''))
 
 
+def _filterparser(subsubparsers):
+    filterparser = subsubparsers.add_parser('filter', help='Display generic info, based on filters')
+    subsubsubparsers = filterparser.add_subparsers(help='Subsubsubcommands', dest='subsubcommand')
+    filtergenericparser = subsubsubparsers.add_parser('generic', help='Print generic info, using filters')
+    filternormalparser = subsubsubparsers.add_parser('normal', help='Print normal info, using filters')
+    
+    filtergenericparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partition filters')
+    filtergenericparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
+    filtergenericparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
+    filtergenericparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
+    filtergenericparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
+    filtergenericparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
+
+    filternormalparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partition filters')
+    filternormalparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
+    filternormalparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
+    filternormalparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
+    filternormalparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
+    filternormalparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
+
+
 # Register 'deploy' subparser modules
 def subparser(subparsers):
     resultparser = subparsers.add_parser('results', help='Create result graphs/statistics')
     subsubparsers = resultparser.add_subparsers(help='Subsubcommands', dest='subcommand')
-    filterparser = subsubparsers.add_parser('filter', help='Display generic info, based on filters')
+    _filterparser(subsubparsers)
+
     mergeparser = subsubparsers.add_parser('merge', help='Merge continuation files into main result files')
+    mergeparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
+
     
-    # subsubsubparsers = filterparser.add_subparsers(help='Subsubsubcommands', dest='subsubcommand')
-    # filtergenericparser = subsubparsers.add_parser('generic', help='Print generic info, using filters')
-    # filternormalparser = subsubparsers.add_parser('normal', help='Print normal info, using filters')
-
-    filterparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partition filters')
-    filterparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
-    filterparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
-    filterparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
-    filterparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
-    filterparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
-
     resultparser.add_argument('data', help='Location of data!', type=str)
     resultparser.add_argument('-l', '--large', help='Forces to generate large graphs, with large text', action='store_true')
     resultparser.add_argument('-ns', '--no-show', dest='no_show', help='Do not show generated graph (useful on servers without xorg forwarding)', action='store_true')
@@ -105,11 +124,16 @@ def results(parser, args):
         printe('[FAILURE] You have no experiment results directory "{}". Run experiments to get some data first.'.format(log.get_metaspark_results_dir()))
     fargs = [args.data, args.large, args.no_show, args.store, args.type]
 
-
+    print(args)
     if args.subcommand == 'filter':
-        import result.filter.generic as f
-        f.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, args.skip_initial)
+        if args.subsubcommand == 'generic':
+            import result.filter.generic as f
+            f.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, args.skip_initial)
+        elif args.subsubcommand == 'normal':
+            import result.filter.normal as n
+            n.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, args.skip_initial)
+
     elif args.subcommand == 'merge':
-        merge(args.data)
+        merge(args.data, args.skip_initial)
     else:
         parser.print_help()
