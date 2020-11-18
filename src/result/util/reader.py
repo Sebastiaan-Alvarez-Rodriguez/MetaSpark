@@ -109,8 +109,8 @@ class Frame(object):
     @property
     def spark_size(self):
         return len(self.spark_i_arr)
-    
-    
+
+        
     @property
     def ds_i_time(self):
         return float(np.sum(self.ds_i_arr)) / 1000000000

@@ -1,36 +1,58 @@
+import matplotlib.pyplot as plt
 import numpy as np
+import scipy.stats as sc
 
 from result.util.reader import Reader
+import result.util.storer as storer
 import util.fs as fs
 import util.location as loc
 
-
 # Plots normal distributions in one figure, using provided filters
-def stats(resultdir, partition, extension, amount, kind, rb):
+def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+    if large:
+        fontsize = 24
+        font = {
+            'family' : 'DejaVu Sans',
+            'weight' : 'bold',
+            'size'   : fontsize
+        }
+        plt.rc('font', **font)
+
+
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
     # print('When looking at the 32, pq, 10000, 20480*8 category:')
     reader = Reader(path)
+    fig, ax = plt.subplots(2)
+    # Multiple plots: https://matplotlib.org/devdocs/gallery/subplots_axes_and_figures/subplots_demo.html
     for frame in reader.read_ops(partition, extension, amount, kind, rb):
-        print('''
---- partition {}, extension {}, amount {}, kind {}, rb {}:
-Dataset
-Total time: {:.3f}s  ({:.3f}s data, {:.3f}s compute)
-Avg time:   {:.3f}s  ({:.3f}s data, {:.3f}s compute)
-stddev:     {:.3f}s  ({:.3f}s data, {:.3f}s compute)
-Incorrect answers: {}
-Spark
-Total time: {:.3f}s  ({:.3f}s data, {:.3f}s compute)
-Avg time:   {:.3f}s  ({:.3f}s data, {:.3f}s compute)
-stddev:     {:.3f}s  ({:.3f}s data, {:.3f}s compute)
-Incorrect answers: {}'''.format(
-    frame.partition, frame.extension, frame.amount, frame.kind, frame.rb,
-    frame.ds_total_time, frame.ds_d_time, frame.ds_c_time,
-    frame.ds_total_avgtime, frame.ds_d_avgtime, frame.ds_c_avgtime,
-    np.std(np.add(frame.ds_d_arr, frame.ds_c_arr))/1000000000, np.std(frame.ds_d_arr)/1000000000, np.std(frame.ds_c_arr)/1000000000,
-    frame.ds_incorrect,
-    frame.spark_total_time, frame.spark_d_time, frame.spark_c_time,
-    frame.spark_total_avgtime, frame.spark_d_avgtime, np.average(frame.spark_c_avgtime),
-    np.std(np.add(frame.spark_d_arr, frame.spark_c_arr))/1000000000, np.std(frame.spark_d_arr)/1000000000, np.std(frame.spark_c_arr)/1000000000,
-    frame.spark_incorrect
-    ))
+        ds_arr = np.add(frame.ds_c_arr, frame.ds_i_arr) / 1000000000
+        spark_arr = np.add(frame.spark_c_arr, frame.spark_i_arr) / 1000000000
+        ds_arr.sort()
+        spark_arr.sort()
+
+        ds_pdf = sc.norm.pdf(ds_arr, np.average(ds_arr), np.std(ds_arr))
+        spark_pdf = sc.norm.pdf(spark_arr, np.average(spark_arr), np.std(spark_arr))
+        ax[0].plot(ds_arr, ds_pdf, label='Dataset')
+        ax[1].plot(spark_arr, spark_pdf, label='Spark')
+
+        ax[0].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Dataset')
+        ax[1].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Spark')
+        if large:
+            fig.legend(loc='right', fontsize=18, frameon=False)
+        else:
+            fig.legend(loc='right', frameon=False)
+
+        if large:
+            fig.set_size_inches(10, 8)
+
+        fig.tight_layout()
+
+        if store_fig:
+           storer.store('faulttolerance', logdir, filetype, plt)
+
+        if large:
+            plt.rcdefaults()
+
+        if not no_show:
+            plt.show()

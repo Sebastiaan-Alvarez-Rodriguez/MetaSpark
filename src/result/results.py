@@ -59,23 +59,14 @@ def merge(data, skip_initial=True):
 
 def _filterparser(subsubparsers):
     filterparser = subsubparsers.add_parser('filter', help='Display generic info, based on filters')
-    subsubsubparsers = filterparser.add_subparsers(help='Subsubsubcommands', dest='subsubcommand')
-    filtergenericparser = subsubsubparsers.add_parser('generic', help='Print generic info, using filters')
-    filternormalparser = subsubsubparsers.add_parser('normal', help='Print normal info, using filters')
-    
-    filtergenericparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partition filters')
-    filtergenericparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
-    filtergenericparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
-    filtergenericparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
-    filtergenericparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
-    filtergenericparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
 
-    filternormalparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partition filters')
-    filternormalparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
-    filternormalparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
-    filternormalparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
-    filternormalparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
-    filternormalparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
+    filterparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partition filters')
+    filterparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
+    filterparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
+    filterparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
+    filterparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
+    filterparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
+    filterparser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: generic, normal, line')
 
 
 # Register 'deploy' subparser modules
@@ -122,17 +113,21 @@ def results(parser, args):
 
     if not fs.isdir(loc.get_metaspark_results_dir()):
         printe('[FAILURE] You have no experiment results directory "{}". Run experiments to get some data first.'.format(log.get_metaspark_results_dir()))
-    fargs = [args.data, args.large, args.no_show, args.store, args.type]
+    fargs = [args.large, args.no_show, args.store, args.type]
 
     print(args)
     if args.subcommand == 'filter':
-        if args.subsubcommand == 'generic':
+        if args.type == 'generic':
             import result.filter.generic as f
             f.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, args.skip_initial)
-        elif args.subsubcommand == 'normal':
+        elif args.type == 'normal':
             import result.filter.normal as n
-            n.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, args.skip_initial)
-
+            n.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, *fargs, args.skip_initial)
+        elif args.type == 'line':
+            import result.filter.line as l
+            l.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, *fargs, args.skip_initial)    
+        else:
+            parser.print_help()
     elif args.subcommand == 'merge':
         merge(args.data, args.skip_initial)
     else:
