@@ -115,10 +115,10 @@ def finished(partition, extension, amount, kind, rb):
 def main():
     eprint('Ready to deploy!')
     partitions = [32, 16, 8, 4]
-    rbs = [20480*8, 20480, 20480*2, 20480*4, 20480*16]
     amounts = [10000, 100000, 1000000, 10000000] #100000000 is off until evening runs
     extensions = ['pq'] #'csv' is off until verified working
     kinds = ['rdd', 'df', 'ds'] #'df_sql' is off until fixed!
+    rbs = [20480*8, 20480, 20480*2, 20480*4, 20480*16]
 
     for rb in rbs:
         for extension in extensions:

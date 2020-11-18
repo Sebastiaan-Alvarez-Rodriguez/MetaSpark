@@ -50,13 +50,14 @@ class Reader(object):
         print('Matched {} files'.format(len(self.files)))
 
     # Lazily read and return data using a filter
-    # Data is provided as dt0, ct0, a0, dt1, ct1, a1
-    def read_ops(self, partition=None, extension=None, amount=None, kind=None, rb=None):
+    # Optionally filter the first 2 measurements, which are uncached
+    # Data is provided as it0, ct0, a0, it1, ct1, a1
+    def read_ops(self, partition=None, extension=None, amount=None, kind=None, rb=None, skip_initial=True):
         self._filter_files(partition, extension, amount, kind, rb)
         for file in self.files:
             with open(file, 'r') as f:
                 identifiers = fs.dirname(file).split(fs.sep())[-4:] + [filename_to_rb(file)]
-                yield Frame(*identifiers, f.readlines())
+                yield Frame(*identifiers, f.readlines(), skip_initial)
 
     @property
     def num_files(self):
@@ -65,11 +66,16 @@ class Reader(object):
 
 class Frame(object):
     '''Frames hold data in numpy arrays, with identifiers'''
-    def __init__(self, partition, extension, amount, kind, rb, lines):
+
+    # Initialize a new frame.
+    # If skip_initial is set, we skip the first 2 entries of lines.
+    # This is useful, because the first 2 entries are without any cached values 
+    def __init__(self, partition, extension, amount, kind, rb, lines, skip_initial=True):
         if len(lines) % 2 != 0:
-            raise RuntimeError('File for "{}" has uneven amount of lines!'.format('{0}/{1}/{2}/{3}/{0}.{1}.{2}.{3}.{4}.res'.format(partition, extension, amount, kind, rb)))
-        
-        dtimes = [int(x.split(', ')[0]) for x in lines]
+            lines = lines[:-1]
+        if skip_initial:
+            lines = lines[2:]
+        itimes = [int(x.split(', ')[0]) for x in lines]
         ctimes = [int(x.split(', ')[1]) for x in lines]
         answers= [int(x.split(', ')[2]) for x in lines]
 
@@ -80,18 +86,34 @@ class Frame(object):
         self.kind = kind
         self.rb = int(rb)
 
-        self.ds_d_arr = np.array(dtimes[::2])
-        self.spark_d_arr = np.array(dtimes[1::2])
+        self.ds_i_arr = np.array(itimes[::2])
+        self.spark_i_arr = np.array(itimes[1::2])
 
         self.ds_c_arr = np.array(ctimes[::2])
         self.spark_c_arr = np.array(ctimes[1::2])
         
         self.ds_a_arr = np.array(answers[::2])
         self.spark_a_arr = np.array(answers[1::2])
+
+    def __len__(self):
+        return self.size
+
+    @property
+    def size(self):
+        return self.ds_size + self.spark_size
+
+    @property
+    def ds_size(self):
+        return len(self.ds_i_arr)
+
+    @property
+    def spark_size(self):
+        return len(self.spark_i_arr)
+    
     
     @property
-    def ds_d_time(self):
-        return float(np.sum(self.ds_d_arr)) / 1000000000
+    def ds_i_time(self):
+        return float(np.sum(self.ds_i_arr)) / 1000000000
     
     @property
     def ds_c_time(self):
@@ -99,11 +121,11 @@ class Frame(object):
     
     @property
     def ds_total_time(self):
-        return self.ds_d_time+self.ds_c_time
+        return self.ds_i_time+self.ds_c_time
     
     @property
-    def spark_d_time(self):
-        return float(np.sum(self.spark_d_arr)) / 1000000000
+    def spark_i_time(self):
+        return float(np.sum(self.spark_i_arr)) / 1000000000
     
     @property
     def spark_c_time(self):
@@ -111,11 +133,11 @@ class Frame(object):
     
     @property
     def spark_total_time(self):
-        return self.spark_d_time+self.spark_c_time
+        return self.spark_i_time+self.spark_c_time
     
     @property
-    def ds_d_avgtime(self):
-        return np.average(self.ds_d_arr) / 1000000000
+    def ds_i_avgtime(self):
+        return np.average(self.ds_i_arr) / 1000000000
         
     @property
     def ds_c_avgtime(self):
@@ -123,11 +145,11 @@ class Frame(object):
     
     @property
     def ds_total_avgtime(self):
-        return self.ds_d_avgtime+self.ds_c_avgtime
+        return self.ds_i_avgtime+self.ds_c_avgtime
     
     @property
-    def spark_d_avgtime(self):
-        return np.average(self.spark_d_arr) / 1000000000
+    def spark_i_avgtime(self):
+        return np.average(self.spark_i_arr) / 1000000000
         
     @property
     def spark_c_avgtime(self):
@@ -135,7 +157,7 @@ class Frame(object):
     
     @property
     def spark_total_avgtime(self):
-        return self.spark_d_avgtime+self.spark_c_avgtime
+        return self.spark_i_avgtime+self.spark_c_avgtime
     
     @property
     def ds_incorrect(self):
