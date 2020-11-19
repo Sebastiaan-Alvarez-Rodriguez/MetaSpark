@@ -12,6 +12,9 @@ def get_metaspark_dep_dir():
 def get_metaspark_data_dir():
     return fs.join(fs.abspath(), 'data')
 
+def get_metaspark_experiments_dir():
+    return fs.join(fs.abspath(), 'experiments')
+
 def get_metaspark_results_dir():
     return fs.join(fs.abspath(), 'results')
 
@@ -45,6 +48,9 @@ def get_spark_conf_dir():
 
 def get_spark_logs_dir():
     return fs.join(get_spark_dir(), 'logs')
+
+def get_spark_work_dir():
+    return fs.join(get_spark_dir(), 'work')
 
 #################### Remote directories ####################
 def get_remote_metaspark_parent_dir():

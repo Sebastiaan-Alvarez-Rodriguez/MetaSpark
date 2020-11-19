@@ -44,9 +44,10 @@ class Reserver(object):
     def stop(self):
         if self._reservation_number == None:
             raise RuntimeError('Cannot stop reservation without reservation number')
-        retval = subprocess.call('preserve -c {}'.format(self.reservation_number), shell=True) == 0
+        out = subprocess.call('preserve -c {}'.format(self.reservation_number), shell=True)
+        retval = out == 0 or out == 33 # Code 33 is sometimes given (no documentation/manual on it). The cluster is deallocated just fine when that happens.
         if not retval:
-            printe('Error while stopping cluster with id {}'.format(self._reservation_number))
+            printe('Error while stopping cluster with id {} (output was {})'.format(self._reservation_number, out))
         else:
             fs.rm(fs.abspath(), 'reservation')
         return retval

@@ -45,65 +45,6 @@ def clean():
     return True
 
 
-# Handles execution on the remote main node, before booting the cluster
-def exec(time_to_reserve, config_filename, debug_mode, fast, no_interact):
-    print('Connected! Using cluster configuration "{}"'.format(config_filename))
-    cluster_cfg = clr.get_or_create_cluster_config(config_filename)
-    if not cluster_cfg:
-        return False
-
-    nodes = cluster_cfg.nodes + 1 # We always want 1 node for the spark master alone
-    if cluster_cfg.coallocation_affinity > 1:
-        nodes = cluster_cfg.coallocation_affinity * cluster_cfg.nodes+1
-        printw('''
-Warning! Configuration specifies "{}" workers per node, {} nodes.
-MetaSpark version RESERVE can only spawn 1 process per node,
-due to some annoying things in Spark 3.0+.
-Spawning {} nodes instead to service your request!
-'''.format(cluster_cfg.coallocation_affinity, cluster_cfg.nodes, nodes-1))
-
-    try:
-        reserver = Reserver.load()
-        if no_interact:
-            reserver.stop()
-        else:
-            if not ui.ask_bool('Found active reservation. Kill it and spawn new (Y) or cancel (n)?'):
-                return False
-        if reserver.stop():
-            prints('Stopped reservation successfully!')
-    except Exception as e:
-        pass
-    print('Booting cluster ({} nodes) for time: {}'.format(nodes, time_to_reserve))
-
-    reserver = Reserver()
-    reserver.reserve(nodes, time_to_reserve)
-    
-    # Remove old logs
-    fs.rm(loc.get_spark_logs_dir(), ignore_errors=True)
-
-    print('Booting network...')
-    
-    port = 7077
-    # Boot master first
-    status = rmt.boot_master(reserver.deployment.master_ip, port=port, debug_mode=debug_mode)
-    if not status:
-        return False
-
-    time.sleep(5) #Give master deamon a head start
-
-    # Boot all slaves in parallel
-    status = rmt.boot_slaves(reserver.deployment.slave_ips, reserver.deployment.master_ip, master_port=port, debug_mode=debug_mode, fast=fast)
-    
-    reserver.deployment.master_port = port
-    # Persists reservation info (reservation number, nodes)
-    reserver.persist()
-    
-    if status:
-        printc('Cluster deployment complete!', Color.PRP)
-    else:
-        printe('Cluster deployment stopped with errors!')
-    return status
-
 # Handles export commandline argument
 def export(full_exp=False):
     print('Copying files using "{}" strategy, using key "{}"...'.format('full' if full_exp else 'fast', metacfg.ssh.ssh_key_name))
@@ -167,7 +108,7 @@ def remote_start(time_to_reserve, config_filename, debug_mode, fast, force_exp, 
     if not config:
         return False
 
-    program = 'exec -c {} -t {}'.format(fs.basename(config.path), time_to_reserve)+(' -d' if debug_mode else '')+(' -f' if fast else '') + (' -ni' if no_interact else '')
+    program = 'start -c {} -t {}'.format(fs.basename(config.path), time_to_reserve)+(' -d' if debug_mode else '')+(' -f' if fast else '') + (' -ni' if no_interact else '')
 
     command = 'ssh {} "python3 {}/main.py {}"'.format(
         metacfg.ssh.ssh_key_name,
@@ -191,6 +132,67 @@ def remote_stop():
 # Redirects execution to settings.py, where user can change settings
 def settings():
     return metacfg.change_settings()
+
+
+# Handles execution on the remote main node, before booting the cluster
+def start(time_to_reserve, config_filename, debug_mode, fast, no_interact):
+    print('Connected! Using cluster configuration "{}"'.format(config_filename))
+    cluster_cfg = clr.get_or_create_cluster_config(config_filename)
+    if not cluster_cfg:
+        return False
+
+    nodes = cluster_cfg.nodes + 1 # We always want 1 node for the spark master alone
+    if cluster_cfg.coallocation_affinity > 1:
+        nodes = cluster_cfg.coallocation_affinity * cluster_cfg.nodes+1
+        printw('''
+Warning! Configuration specifies "{}" workers per node, {} nodes.
+MetaSpark version RESERVE can only spawn 1 process per node,
+due to some annoying things in Spark 3.0+.
+Spawning {} nodes instead to service your request!
+'''.format(cluster_cfg.coallocation_affinity, cluster_cfg.nodes, nodes-1))
+
+    try:
+        reserver = Reserver.load()
+        if no_interact:
+            reserver.stop()
+        else:
+            if not ui.ask_bool('Found active reservation. Kill it and spawn new (Y) or cancel (n)?'):
+                return False
+        if reserver.stop():
+            prints('Stopped reservation successfully!')
+    except Exception as e:
+        pass
+    print('Booting cluster ({} nodes) for time: {}'.format(nodes, time_to_reserve))
+
+    reserver = Reserver()
+    reserver.reserve(nodes, time_to_reserve)
+    
+    # Remove old logs
+    fs.rm(loc.get_spark_logs_dir(), ignore_errors=True)
+
+    print('Booting network...')
+    
+    port = 7077
+    # Boot master first
+    status = rmt.boot_master(reserver.deployment.master_ip, port=port, debug_mode=debug_mode)
+    if not status:
+        return False
+
+    time.sleep(5) #Give master deamon a head start
+
+    # Boot all slaves in parallel
+    status = rmt.boot_slaves(reserver.deployment.slave_ips, reserver.deployment.master_ip, master_port=port, debug_mode=debug_mode, fast=fast)
+    
+    reserver.deployment.master_port = port
+    # Persists reservation info (reservation number, nodes)
+    reserver.persist()
+    
+    if status:
+        printc('Cluster deployment complete!', Color.PRP)
+    else:
+        printe('Cluster deployment stopped with errors!')
+    return status
+
 
 # Stop cluster running here, if any is running
 def stop(silent=False):
@@ -217,13 +219,13 @@ def main():
     resultparser = results.subparser(subparsers)
     checkparser = subparsers.add_parser('check', help='check whether environment has correct tools')
     
-    execparser = subparsers.add_parser('exec', help='call this on the DAS5 to handle server orchestration')
-    execparser.add_argument('-c', '--clusterconfig', metavar='config', type=str, help='Cluster config filename to use for execution')
-    execparser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
-    execparser.add_argument('-f', '--fast', help='Use fast mode for cluster', action='store_true')
-    execparser.add_argument('-ni', '--no_interact', help='No more questions about running reservations. Just kill and boot.', action='store_true')
-    execparser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
-    execparser.add_argument('--internal', nargs=1, type=str, help=argparse.SUPPRESS)
+    startparser = subparsers.add_parser('start', help='call this on the DAS5 to handle server orchestration')
+    startparser.add_argument('-c', '--clusterconfig', metavar='config', type=str, help='Cluster config filename to use for execution')
+    startparser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
+    startparser.add_argument('-f', '--fast', help='Use fast mode for cluster', action='store_true')
+    startparser.add_argument('-ni', '--no_interact', help='No more questions about running reservations. Just kill and boot.', action='store_true')
+    startparser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
+    startparser.add_argument('--internal', nargs=1, type=str, help=argparse.SUPPRESS)
 
     exportparser = subparsers.add_parser('export', help='export only metaspark and script code to the DAS5')
     
@@ -254,10 +256,6 @@ def main():
         retval = results.results(resultparser, args)
     elif args.command == 'check':
         retval = check()
-    elif args.command == 'exec' and args.internal:
-        retval = _exec_internal(args.internal[0], args.debug_mode)
-    elif args.command == 'exec':
-        retval = exec(args.time_alloc, args.clusterconfig, args.debug_mode, args.fast, args.no_interact)
     elif args.command == 'export':
         retval = export(full_exp=True)
     elif args.command == 'init' and args.internal:
@@ -271,6 +269,10 @@ def main():
             retval = remote_stop()
         else:
             remoteparser.print_help()
+    elif args.command == 'start' and args.internal:
+        retval = _start_internal(args.internal[0], args.debug_mode)
+    elif args.command == 'start':
+        retval = start(args.time_alloc, args.clusterconfig, args.debug_mode, args.fast, args.no_interact)
     elif args.command == 'stop':
         retval = retval = stop()
     elif args.command == 'settings':

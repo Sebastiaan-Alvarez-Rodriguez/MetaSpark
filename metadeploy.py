@@ -60,7 +60,7 @@ def stop_cluster():
 
 # Start a cluster with partition nodes
 def start_cluster(partition, time):
-    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py exec -c {}.cfg -t {} -f -ni'.format(partition, time)
+    command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py start -c {}.cfg -t {} -f -ni'.format(partition, time)
     if not try_os_command(command, 'Big problem starting cluster!'):
         return False
     command = 'python3 /var/scratch/hpcl1910/MetaSpark/main.py deploy data /var/scratch/hpcl1910/MetaSpark/*.pq --internal --skip'.format(partition)

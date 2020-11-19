@@ -7,6 +7,7 @@ import os
 import socket
 
 from config.meta import cfg_meta_instance as metacfg
+import dynamic.experiment as exp
 from remote.reservation import Reserver
 import remote.util.ip as ip
 from util.executor import Executor
@@ -16,12 +17,18 @@ from util.printer import *
 import util.time as tm
 import util.ui as ui
 
-def _args_replace(args, timestamp):
-    tmp1 = args.replace('[[RESULTDIR]]', fs.join(loc.get_metaspark_results_dir(), timestamp))
+def _args_replace(args, timestamp, no_result=False):    
+    tmp1 = args if no_result else args.replace('[[RESULTDIR]]', fs.join(loc.get_metaspark_results_dir(), timestamp))
     return tmp1.replace('[[DATADIR]]', loc.get_node_local_ssd_dir())
 
 
-def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_opts):
+def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
+    if args == None:
+        args = ''
+    if extra_jars == None:
+        extra_jars = ''
+    if submit_opts == None:
+        submit_opts = ''
     print('Connected!')
     scriptloc = fs.join(loc.get_spark_bin_dir(), 'spark-submit')
 
@@ -35,18 +42,21 @@ def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_op
         printe('Reservation file found, no longer active')
         return False
 
-    timestamp = tm.timestamp('%Y-%m-%d_%H:%M:%S.%f')
-    fs.mkdir(loc.get_metaspark_results_dir(), timestamp)
+    if no_resultdir:
+        driver_opts = '-Dlog4j.configuration=file:{}'.format(fs.join(loc.get_metaspark_log4j_conf_dir(),'driver_log4j.properties'))
+        timestamp = None
+    else:
+        timestamp = tm.timestamp('%Y-%m-%d_%H:%M:%S.%f')
+        fs.mkdir(loc.get_metaspark_results_dir(), timestamp)
+        driver_opts = '-Dlog4j.configuration=file:{} -Doutputlog={}'.format(
+            fs.join(loc.get_metaspark_log4j_conf_dir(),'driver_log4j.properties'),
+            fs.join(loc.get_metaspark_results_dir(), timestamp, 'spark.log'))
+        print('Output log can be found at {}'.format(fs.join(loc.get_metaspark_results_dir(), timestamp)))
 
-    driver_opts = '-Dlog4j.configuration=file:{} -Doutputlog={}'.format(
-        fs.join(loc.get_metaspark_log4j_conf_dir(),'driver_log4j.properties'),
-        fs.join(loc.get_metaspark_results_dir(), timestamp, 'spark.log'))
+    args = _args_replace(args, timestamp, no_result=no_resultdir)
+    submit_opts = _args_replace(submit_opts, timestamp, no_result=no_resultdir)
 
-    args = _args_replace(args, timestamp)
-    submit_opts = _args_replace(submit_opts, timestamp)
-
-    print('Output log can be found at {}'.format(fs.join(loc.get_metaspark_results_dir(), timestamp)))
-
+    
     if len(extra_jars) > 0:
         extra_jars = ','.join([fs.join(loc.get_metaspark_jar_dir(), x) for x in extra_jars.split(' ')])+','
     command = '{}\
@@ -77,7 +87,7 @@ def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_op
     return status
 
 
-def _deploy_application(jarfile, mainclass, args, extra_jars, submit_opts):
+def _deploy_application(jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
     fs.mkdir(loc.get_metaspark_jar_dir(), exist_ok=True)
     if not fs.isfile(loc.get_metaspark_jar_dir(), jarfile):
         printw('Provided jarfile "{}" not found at "{}"'.format(jarfile, loc.get_metaspark_jar_dir()))
@@ -102,6 +112,7 @@ def _deploy_application(jarfile, mainclass, args, extra_jars, submit_opts):
 
     program = '{} {} --internal --args \'{}\' --jars \'{}\' --opts \'{}\''.format(
         jarfile, mainclass, args, extra_jars, submit_opts)
+    program += '--no-resultdir' if no_resultdir else '' 
 
     command = 'ssh {} "python3 {}/main.py deploy application {}"'.format(
     metacfg.ssh.ssh_key_name,
@@ -165,6 +176,22 @@ def _deploy_data(datalist, skip):
     return os.system(command) == 0
 
 
+def _deploy_meta():
+    try:
+        experiments = exp.get_experiments()
+    except RuntimeError as e:
+        printe('Could not find an experiment to run. Please make an experiment in {}. See the README.md for more info.'.format(loc.get_metaspark_experiments_dir()))
+        return False
+    for idx, x in enumerate(experiments):
+        print('Starting experiment {}'.format(idx))
+        if x.start():
+            print('Experiment {} completed successfully'.format(idx))
+        else:
+            print('There were some problems during experiment {}!'.format(idx))
+        x.stop()
+        print('Experiment {} stopped'.format(idx))
+    return True
+
 # Register 'deploy' subparser modules
 def subparser(subparsers):
     deployparser = subparsers.add_parser('deploy', help='Deploy applications/data (use deploy -h to see more...)')
@@ -176,13 +203,18 @@ def subparser(subparsers):
     deployapplparser.add_argument('--args', nargs='+', metavar='argument', help='Arguments to pass on to your jarfile')
     deployapplparser.add_argument('--jars', nargs='+', metavar='argument', help='Extra jars to pass along your jarfile')
     deployapplparser.add_argument('--opts', nargs='+', metavar='argument', help='Extra arguments to pass on to spark-submit')    
+    deployapplparser.add_argument('--no-resultdir', dest='no_resultdir', help='Do not make a resultdirectory in <project root>/results/ for this deployment', action='store_true')
     deployapplparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
 
     deploydataparser = subsubparsers.add_parser('data', help='Deploy data (use deploy start -h to see more...)')
     deploydataparser.add_argument('data', nargs='+', metavar='file', help='Files to place on reserved nodes local drive')
     deploydataparser.add_argument('--skip', help='Skip data if already found on remote', action='store_true')
     deploydataparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
-    return deployparser, deployapplparser, deploydataparser
+    
+    deploymetaparser = subsubparsers.add_parser('meta', help='Deploy applications with all variations of given parameters')
+    deploymetaparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
+
+    return deployparser, deployapplparser, deploymetaparser, deploydataparser
 
 
 # Return True if we found arguments used from this subparser, False otherwise
@@ -193,6 +225,7 @@ def deploy_args_set(args):
 
 # Processing of deploy commandline args occurs here
 def deploy(parsers, args):
+    deployparser, deployapplparser, deploymetaparser, deploydataparser = parsers
     if args.subcommand == 'application':
         jarfile = args.jarfile
         mainclass = args.mainclass
@@ -200,11 +233,16 @@ def deploy(parsers, args):
         extra_jars = ' '.join(args.jars) if args.jars != None else ''
         submit_opts = ' '.join(args.opts) if args.opts != None else ''
         if args.internal:
-            return _deploy_application_internal(jarfile, mainclass, jargs, extra_jars, submit_opts)
+            return _deploy_application_internal(jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir)
         else:
-            return _deploy_application(jarfile, mainclass, jargs, extra_jars, submit_opts)
+            return _deploy_application(jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir)
     elif args.subcommand == 'data':
         if args.internal:
             return _deploy_data_internal(args.data, args.skip)
         else:
             return _deploy_data(args.data, args.skip)
+    elif args.subcommand == 'meta':
+        _deploy_meta()
+
+    else:
+        deployparser.print_help()

@@ -121,16 +121,16 @@ def results(parser, args):
         fdata = [args.partition, args.extension, args.amount, args.kind, args.readbuffer]
         if args.type == 'barplot':
             import result.filter.barplot as b
-            b.stats(args.data, *fdata, *fargs, args.skip_initial)
+            b.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         elif args.type == 'generic':
             import result.filter.generic as f
-            f.stats(args.data, *fdata, args.skip_initial)
+            f.stats(args.data, *(fdata+[args.skip_initial]))
         elif args.type == 'line':
             import result.filter.line as l
-            l.stats(args.data, *fdata, *fargs, args.skip_initial)    
+            l.stats(args.data, *(fdata+fargs+[args.skip_initial]))    
         elif args.type == 'normal':
             import result.filter.normal as n
-            n.stats(args.data, *fdata, *fargs, args.skip_initial)
+            n.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         else:
             parser.print_help()
     elif args.subcommand == 'merge':
