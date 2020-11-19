@@ -59,7 +59,7 @@ class MetaDeploy(object):
                 state = tmp
 
             if unchanged == dead_after_retries:
-                printe('Value ({}) did not change in {} times {} seconds!'.format(val, dead_after_retries, sleeptime))
+                self.printe('Value ({}) did not change in {} times {} seconds!'.format(val, dead_after_retries, sleeptime))
                 return False
             time.sleep(sleeptime)
 
