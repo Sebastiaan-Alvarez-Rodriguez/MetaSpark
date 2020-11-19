@@ -28,19 +28,19 @@ class Reader(object):
         self.files = []
         for dpartition in sorted(fs.ls(self.path, only_dirs=True), key=lambda x: int(x)):
             if not _match(dpartition, partition):
-                printw('Partition={} did not match filter={}'.format(dpartition, partition))
+                # printw('Partition={} did not match filter={}'.format(dpartition, partition))
                 continue
             for dextension in fs.ls(fs.join(self.path, dpartition), only_dirs=True):
                 if not _match(dextension, extension):
-                    printw('Extension={} did not match filter={}'.format(dextension, extension))
+                    # printw('Extension={} did not match filter={}'.format(dextension, extension))
                     continue
                 for damount in sorted(fs.ls(fs.join(self.path, dpartition, dextension), only_dirs=True), key=lambda x: int(x)):
                     if not _match(damount, amount):
-                        printw('Amount={} did not match filter={}'.format(damount, amount))
+                        # printw('Amount={} did not match filter={}'.format(damount, amount))
                         continue
                     for dkind in fs.ls(fs.join(self.path, dpartition, dextension, damount), only_dirs=True):
                         if not _match(dkind, kind):
-                            printw('Kind={} did not match filter={}'.format(dkind, kind))
+                            # printw('Kind={} did not match filter={}'.format(dkind, kind))
                             continue
                         for outfile in sorted([x for x in fs.ls(fs.join(self.path, dpartition, dextension, damount, dkind), only_files=True, full_paths=True) if x.endswith('.res')], key=lambda x: filename_to_rb(x)):
                             frb = filename_to_rb(outfile)

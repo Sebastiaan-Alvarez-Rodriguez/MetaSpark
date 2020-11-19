@@ -66,7 +66,7 @@ def _filterparser(subsubparsers):
     filterparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
     filterparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
     filterparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
-    filterparser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: generic, normal, line')
+    filterparser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: barplot, generic, line, normal')
 
 
 # Register 'deploy' subparser modules
@@ -82,8 +82,8 @@ def subparser(subparsers):
     resultparser.add_argument('data', help='Location of data!', type=str)
     resultparser.add_argument('-l', '--large', help='Forces to generate large graphs, with large text', action='store_true')
     resultparser.add_argument('-ns', '--no-show', dest='no_show', help='Do not show generated graph (useful on servers without xorg forwarding)', action='store_true')
-    resultparser.add_argument('-s', '--store', help='Store generated graph (in /metazoo/graphs/<graph_name>/<timestamp>.<type>)', action='store_true')
-    resultparser.add_argument('-t', '--type', nargs=1, help='Preferred storage type (default=pdf)', default='pdf')
+    resultparser.add_argument('-s', '--store', help='Store generated graph (in {}/<resultdirname>/<graph_name>.<type>)'.format(loc.get_metaspark_graphs_dir()), action='store_true')
+    resultparser.add_argument('-t', '--storetype', nargs=1, help='Preferred storage type (default=pdf)', default='pdf')
     return resultparser
 
 # Return True if we found arguments used from this subparser, False otherwise
@@ -103,29 +103,34 @@ def results(parser, args):
         printe('Cannot work with results. Numpy is not available!')
         return
 
-    if args.store and args.type is None:
-        parser.error('--store (-st) requires --type (-t)')
+    if args.store and args.storetype is None:
+        parser.error('--store (-st) requires --storetype (-t)')
         return
+    args.storetype = args.storetype[0]
     import result.util.storer as storer # We can only import storer here, as it depends on matplotlib and we don't want to check matplotlib availibility again
-    if args.store and not storer.filetype_is_supported(args.type):
-        parser.error('--type only supports filetypes: '+', '.join(storer.supported_filetypes()))
+    if args.store and not storer.filetype_is_supported(args.storetype):
+        parser.error('--storetype only supports filetypes: {} (not given: {})'.format(', '.join(storer.supported_filetypes()), args.storetype))
         return
 
     if not fs.isdir(loc.get_metaspark_results_dir()):
         printe('[FAILURE] You have no experiment results directory "{}". Run experiments to get some data first.'.format(log.get_metaspark_results_dir()))
-    fargs = [args.large, args.no_show, args.store, args.type]
+    fargs = [args.large, args.no_show, args.store, args.storetype]
 
-    print(args)
+
     if args.subcommand == 'filter':
-        if args.type == 'generic':
+        fdata = [args.partition, args.extension, args.amount, args.kind, args.readbuffer]
+        if args.type == 'barplot':
+            import result.filter.barplot as b
+            b.stats(args.data, *fdata, *fargs, args.skip_initial)
+        elif args.type == 'generic':
             import result.filter.generic as f
-            f.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, args.skip_initial)
-        elif args.type == 'normal':
-            import result.filter.normal as n
-            n.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, *fargs, args.skip_initial)
+            f.stats(args.data, *fdata, args.skip_initial)
         elif args.type == 'line':
             import result.filter.line as l
-            l.stats(args.data, args.partition, args.extension, args.amount, args.kind, args.readbuffer, *fargs, args.skip_initial)    
+            l.stats(args.data, *fdata, *fargs, args.skip_initial)    
+        elif args.type == 'normal':
+            import result.filter.normal as n
+            n.stats(args.data, *fdata, *fargs, args.skip_initial)
         else:
             parser.print_help()
     elif args.subcommand == 'merge':

@@ -17,5 +17,5 @@ def filetype_is_supported(extension):
 
 # Stores given <plotlike> in dir <dirname>/<filename>.<filetype>, passing kwargs to <plotlike>.savefig()
 def store(dirname, filename, filetype, plotlike, **kwargs):
-    fs.mkdir(loc.get_metazoo_graphs_dir(), dirname, exist_ok=True)
-    plotlike.savefig(fs.join(loc.get_metazoo_graphs_dir(), dirname, '{}.{}'.format(filename, filetype)), **kwargs)
+    fs.mkdir(loc.get_metaspark_graphs_dir(), dirname, exist_ok=True)
+    plotlike.savefig(fs.join(loc.get_metaspark_graphs_dir(), dirname, '{}.{}'.format(filename, filetype)), **kwargs)

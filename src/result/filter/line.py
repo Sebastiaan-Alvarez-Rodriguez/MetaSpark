@@ -27,8 +27,8 @@ def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, sto
         
         ds_arr = np.add(frame.ds_c_arr, frame.ds_i_arr)
         spark_arr = np.add(frame.spark_c_arr, frame.spark_i_arr)
-        ds_arr.sort()
-        spark_arr.sort()
+        # ds_arr.sort()
+        # spark_arr.sort()
         
         ax.plot(ds_arr / 1000000000, label='Dataset')
         ax.plot(spark_arr / 1000000000, label='Spark')
@@ -44,7 +44,7 @@ def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, sto
         fig.tight_layout()
 
         if store_fig:
-           storer.store('scatter', resultdir, filetype, plt)
+           storer.store(resultdir, 'line', filetype, plt)
 
         if large:
             plt.rcdefaults()
