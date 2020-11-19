@@ -3,6 +3,9 @@ __pycache__/
 !/conf/log4j/
 /data/
 /deps/
+/experiments/*
+!/experiments/examples
+!/experiments/interface.py
 /jars/
 /reservation
 /results/
