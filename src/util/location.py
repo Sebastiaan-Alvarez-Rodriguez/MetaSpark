@@ -4,6 +4,7 @@
 
 import util.fs as fs
 from config.meta import cfg_meta_instance as metacfg
+from remote.util.deploymode import DeployMode
 
 #################### MetaSpark directories ####################
 def get_metaspark_dep_dir():
@@ -49,8 +50,17 @@ def get_spark_conf_dir():
 def get_spark_logs_dir():
     return fs.join(get_spark_dir(), 'logs')
 
-def get_spark_work_dir():
-    return fs.join(get_spark_dir(), 'work')
+def get_spark_work_dir(deploy_mode):
+    if deploy_mode == DeployMode.STANDARD:
+        return fs.join(get_spark_dir(), 'work')
+    elif deploy_mode == DeployMode.LOCAL:
+        return fs.join(loc.get_node_local_dir(), metacfg.ssh.ssh_user_name, 'work')
+    elif deploy_mode == DeployMode.LOCAL_SSD:
+        return fs.join(loc.get_node_local_ssd_dir(), metacfg.ssh.ssh_user_name, 'work')
+    elif deploy_mode == DeployMode.RAM:
+        return fs.join(loc.get_node_ram_dir(), metacfg.ssh.ssh_user_name, 'work')
+    else:
+        raise RuntimeError('Could not find a workdir destination for deploymode: {}'.format(deploy_mode))
 
 #################### Remote directories ####################
 def get_remote_metaspark_parent_dir():
@@ -73,7 +83,21 @@ def get_remote_metaspark_data_dir():
 def get_node_local_dir():
     return '/local/{}/'.format(metacfg.ssh.ssh_user_name)
 
-# What is faster than a local dir? That's right, a local dir mapped on an ssd!
+# Faster dir than /local/. This is a local dir mapped on an SSD!
+# Note: Not all machines have this directory. Others have it but deny permission,
+# because the particular node has no SSD.
+# Need a special allocation command to get only nodes with SSD disks.
 def get_node_local_ssd_dir():
-    return get_node_local_dir() # Somehow, they stopped write permission to local-ssd
-    # return '/local-ssd/{}/'.format(metacfg.ssh.ssh_user_name)
+    return '/local-ssd/{}/'.format(metacfg.ssh.ssh_user_name)
+
+def get_node_data_dir(deploy_mode):
+    if deploy_mode == DeployMode.STANDARD:
+        return get_metaspark_data_dir()
+    elif deploy_mode == DeployMode.LOCAL:
+        return fs.join(loc.get_node_local_dir(), metacfg.ssh.ssh_user_name, 'data')
+    elif deploy_mode == DeployMode.LOCAL_SSD:
+        return fs.join(loc.get_node_local_ssd_dir(), metacfg.ssh.ssh_user_name, 'data')
+    elif deploy_mode == DeployMode.RAM:
+        return fs.join(loc.get_node_ram_dir(), metacfg.ssh.ssh_user_name, 'data')
+    else:
+        raise RuntimeError('Could not find a datadir destination for deploymode: {}'.format(deploy_mode))

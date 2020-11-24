@@ -14,6 +14,7 @@ import config.cluster as clr
 import deploy.deploy as deploy
 import remote.remote as rmt
 from remote.reservation import Reserver
+from remote.util.deploymode import DeployMode
 import result.results as results
 import supplier.spark as spk
 import supplier.java as jv
@@ -135,11 +136,14 @@ def settings():
 
 
 # Handles execution on the remote main node, before booting the cluster
-def start(time_to_reserve, config_filename, debug_mode, fast, no_interact):
+def start(time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact):
     print('Connected! Using cluster configuration "{}"'.format(config_filename))
     cluster_cfg = clr.get_or_create_cluster_config(config_filename)
     if not cluster_cfg:
         return False
+
+    deploy_mode = DeployMode.interpret_deploy_mode(deploy_mode)
+
 
     nodes = cluster_cfg.nodes + 1 # We always want 1 node for the spark master alone
     if cluster_cfg.coallocation_affinity > 1:
@@ -181,7 +185,7 @@ Spawning {} nodes instead to service your request!
     time.sleep(5) #Give master deamon a head start
 
     # Boot all slaves in parallel
-    status = rmt.boot_slaves(reserver.deployment.slave_ips, reserver.deployment.master_ip, master_port=port, debug_mode=debug_mode, fast=fast)
+    status = rmt.boot_slaves(reserver.deployment.slave_ips, reserver.deployment.master_ip, master_port=port, debug_mode=debug_mode, deploy_mode=deploy_mode)
     
     reserver.deployment.master_port = port
     # Persists reservation info (reservation number, nodes)
@@ -222,7 +226,7 @@ def main():
     startparser = subparsers.add_parser('start', help='call this on the DAS5 to handle server orchestration')
     startparser.add_argument('-c', '--clusterconfig', metavar='config', type=str, help='Cluster config filename to use for execution')
     startparser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
-    startparser.add_argument('-f', '--fast', help='Use fast mode for cluster', action='store_true')
+    startparser.add_argument('-dm', '--deploy-mode', dest='deploy_mode', type=str, metavar='mode', default=str(DeployMode.STANDARD), help='Deployment mode for cluster', choices=[str(x) for x in DeployMode])
     startparser.add_argument('-ni', '--no_interact', help='No more questions about running reservations. Just kill and boot.', action='store_true')
     startparser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
     startparser.add_argument('--internal', nargs=1, type=str, help=argparse.SUPPRESS)
@@ -237,8 +241,8 @@ def main():
     remotestartparser = subsubparsers.add_parser('start', help='Start cluster on DAS5 from your local machine')
     remotestartparser.add_argument('-c', '--clusterconfig', metavar='config', type=str, help='Cluster config filename to use for execution')
     remotestartparser.add_argument('-d', '--debug-mode', dest='debug_mode', help='Run remote in debug mode', action='store_true')
+    remotestartparser.add_argument('-dm', '--deploy-mode', dest='deploy_mode', type=str, metavar='mode', default=str(DeployMode.STANDARD), help='Deployment mode for cluster', choices=[str(x) for x in DeployMode])
     remotestartparser.add_argument('-e', '--force-export', dest='force_exp', help='Forces to re-do the export phase', action='store_true')
-    remotestartparser.add_argument('-f', '--fast', help='Use fast mode for cluster', action='store_true')
     remotestartparser.add_argument('-ni', '--no_interact', help='No more questions about running reservations. Just kill and boot.', action='store_true')
     remotestartparser.add_argument('-t', '--time', dest='time_alloc', nargs='?', metavar='[[hh:]mm:]ss', const='15:00', default='15:00', type=str, help='Amount of time to allocate on clusters during a run')
     
@@ -264,7 +268,7 @@ def main():
         retval = init()
     elif args.command == 'remote':
         if args.subcommand=='start':
-            retval = remote_start(args.time_alloc, args.clusterconfig, args.debug_mode, args.fast, args.force_exp, args.no_interact)
+            retval = remote_start(args.time_alloc, args.clusterconfig, args.debug_mode, args.deploy_mode, args.force_exp, args.no_interact)
         elif args.subcommand=='stop':
             retval = remote_stop()
         else:
@@ -272,7 +276,7 @@ def main():
     elif args.command == 'start' and args.internal:
         retval = _start_internal(args.internal[0], args.debug_mode)
     elif args.command == 'start':
-        retval = start(args.time_alloc, args.clusterconfig, args.debug_mode, args.fast, args.no_interact)
+        retval = start(args.time_alloc, args.clusterconfig, args.debug_mode, args.deploy_mode, args.no_interact)
     elif args.command == 'stop':
         retval = retval = stop()
     elif args.command == 'settings':

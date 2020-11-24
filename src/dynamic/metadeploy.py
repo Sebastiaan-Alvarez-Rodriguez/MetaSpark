@@ -8,6 +8,8 @@ import sys
 import time
 
 from config.meta import cfg_meta_instance as metacfg
+from remote.reservation import Reserver
+import remote.util.deploymode as DeployMode
 import util.fs as fs
 import util.location as loc
 
@@ -22,6 +24,8 @@ class MetaDeployState(Enum):
 class MetaDeploy(object):
     '''Object to dynamically pass to meta deployment setups'''
     
+    def __init__(self):
+        self._deploymode = None
     '''
     Block for given command
     Command must return a MetaDeployState, optionally with an additional value
@@ -67,14 +71,16 @@ class MetaDeploy(object):
     '''
     Starts a cluster with given time_to_reserve, config_filename, etc.
     If debug_mode is True, we print extra information. Do not use for production.
-    If fast is True, we allocate Spark worker work directories on local disks (making them faster)
+    deploy_mode determines where we place Spark worker work directories (e.g. on NFS mount, local disks, RAMdisk, local-ssd)
     If no_interact is True, we never ask stuff to the user, useful for running batch-jobs.
     We try to boot the cluster for retries retries. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def cluster_start(self, time_to_reserve, config_filename, debug_mode, fast, no_interact, retries=5, retry_sleep_time=5):
+    def cluster_start(self, time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact, retries=5, retry_sleep_time=5):
+        self._deploymode = DeployMode.interpret_deploymode(deploy_mode)
         from main import start
         for x in range(retries):
-            if start(time_to_reserve, config_filename, debug_mode, fast, no_interact):
+            if start(time_to_reserve, config_filename, debug_mode, str(self._deploymode), no_interact):
+                self._deployment = Reserver.load().deployment
                 return True
             time.sleep(retry_sleep_time)
         return False
@@ -92,14 +98,34 @@ class MetaDeploy(object):
             time.sleep(retry_sleep_time)
         return False
 
+
     # Remove junk generated during each run. Please use this between runs, not in a run
-    def clean_junk(self):
-        node_local_work = fs.join(loc.get_node_local_dir(), metacfg.ssh.ssh_user_name, 'work')
-        node_local_work_ssd = fs.join(loc.get_node_local_ssd_dir(), metacfg.ssh.ssh_user_name, 'work')
-        nfs_work = loc.get_spark_work_dir()
-        nfs_log = loc.get_spark_logs_dir()
-        command = 'rm -rf {} {} {} {}'.format(node_local_work, node_local_work_ssd, nfs_work, nfs_log)
-        return os.system(command) == 0
+    def clean_junk(self, fast=False):
+        if self._deploymode == None: # We don't know where to clean. Clean everywhere
+            workdirs = ' '.join([loc.get_spark_work_dir(val) for val in DeployMode])
+            fast = False # we don't know the node numbers!
+        else:
+            workdirs = loc.get_spark_work_dir(self._deploymode)
+
+        if fast:
+            nfs_log = loc.get_spark_logs_dir()
+            command = 'rm -rf {} {}'.format(workdirs, nfs_log)
+            return os.system(command) == 0
+        else:
+            executors = []
+            nfs_log = loc.get_spark_logs_dir()
+            log_command = 'rm -rf {}'.format(nfs_log)
+            executors.append(Executor(log_command, shell=True))
+            for x in self._deployment.nodes:
+                clean_command = 'ssh {} "rm -rf {} {}"'.format(x, workdirs, nfs_log)
+                executors.append(Executor(clean_command, shell=True))
+            Executor.run_all(executors)
+            state = Executor.wait_all(executors, stop_on_error=False)
+            if state:
+                prints('Clean success!')
+            else:
+                printe('Clean failure!')
+            return state
 
     '''
     Deploy an application. We require the following parameters:
@@ -123,13 +149,14 @@ class MetaDeploy(object):
     '''
     Deploy data on the local drive of a node. We require:
     datalist the files/directories to deploy, as a list of string filenames (which exist in <project root>/data/),
-    skip value (if True, we skip copying data that already exists in a particular node's local drive)
+    deploy_mode the deploy-mode for the data. Determines whether we place data on the NFS mount, local disk, RAMdisk etc,
+    skip value (if True, we skip copying data that already exists in a particular node's local drive),
     retries for trying to deploy the application. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def deploy_data(self, datalist, skip, retries=5, retry_sleep_time=5):
+    def deploy_data(self, datalist, deploy_mode, skip, retries=5, retry_sleep_time=5):
         from deploy.deploy import _deploy_data_internal
         for x in range(retries):
-            if _deploy_data_internal(datalist, skip):
+            if _deploy_data_internal(datalist, deploy_mode, skip):
                 return True
             time.sleep(retry_sleep_time)
         return False

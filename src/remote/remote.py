@@ -2,6 +2,7 @@
 
 import socket
 
+from remote.util.deploymode import DeployMode
 import util.fs as fs
 import util.location as loc
 from util.executor import Executor
@@ -40,10 +41,11 @@ Provide
     master_port:    port for master
     procs_per_node: Amount of slaves to spawn on this node
     debug_mode:     True if we must print debug info, False otherwiseexecute
-    fast:           If True, sets slave work-dir on local SSD for more speed, uses slow NFS-mount otherwise
-    execute:        Function executes built command and returns state_ok (another bool) if True, returns Executor if False
+    deploy_mode:    Determines where we should place slave work-dir: E.g. on local SSD, slow NFS-mount, etc
+    execute:        Function executes boot command and returns state_ok (a bool) if True,
+                    otherwise returns Executor to boot slave, which you have to execute to deploy slave
 '''
-def boot_slave(node, master_node, master_port=7077, debug_mode=False, fast=False, execute=True):
+def boot_slave(node, master_node, master_port=7077, debug_mode=False, deploy_mode=False, execute=True):
     scriptloc = fs.join(loc.get_spark_sbin_dir(), 'start-slave.sh')
     master_url = 'spark://{}:{}'.format(master_node, master_port)
 
@@ -60,7 +62,7 @@ def boot_slave(node, master_node, master_port=7077, debug_mode=False, fast=False
             node,
             scriptloc,
             master_url,
-            '--work-dir {}'.format(loc.get_node_local_ssd_dir()) if fast else '',
+            '--work-dir {}'.format(loc.get_spark_work_dir(deploy_mode)),
             '> /dev/null 2>&1' if not debug_mode else ''
         )
 
@@ -82,12 +84,12 @@ Provide
     nodes:          ip/hostname list of nodes to boot workers on
     master_node:    ip/hostname of master
     master_port:    port for master
-    fast:           If True, sets slave work-dir on local SSD for more speed, uses slow NFS-mount otherwise
     debug_mode:     True if we must print debug info, False otherwise
+    deploymode:     Denotes where we locate the slave work-dir: E.g. on NFS-mount for debugging (slow), on local disk for each node, etc
 '''
-def boot_slaves(nodes, master_node, master_port=7077, debug_mode=False, fast=False):
+def boot_slaves(nodes, master_node, master_port=7077, debug_mode=False, deploy_mode=DeployMode.STANDARD):
     executors = []
     for node in nodes:
-        executors.append(boot_slave(node, master_node, master_port=master_port, fast=fast, debug_mode=debug_mode, execute=False))
+        executors.append(boot_slave(node, master_node, master_port=master_port, deploy_mode=deploy_mode, debug_mode=debug_mode, execute=False))
     Executor.run_all(executors)
     return Executor.wait_all(executors)

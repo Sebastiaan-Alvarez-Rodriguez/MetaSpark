@@ -9,6 +9,7 @@ import socket
 from config.meta import cfg_meta_instance as metacfg
 import dynamic.experiment as exp
 from remote.reservation import Reserver
+from remote.util.deploymode import DeployMode
 import remote.util.ip as ip
 from util.executor import Executor
 import util.location as loc
@@ -122,7 +123,7 @@ def _deploy_application(jarfile, mainclass, args, extra_jars, submit_opts, no_re
     return os.system(command) == 0
 
 
-def _deploy_data_internal(datalist, skip):
+def _deploy_data_internal(datalist, deploy_mode, skip):
     print('Synchronizing data to local nodes...')
     data = ' '.join([fs.join(loc.get_metaspark_data_dir(), fs.basename(x)) for x in datalist])
     try:
@@ -134,14 +135,21 @@ def _deploy_data_internal(datalist, skip):
         printe('Reservation file found, no longer active')
         return False
     executors = []
-    for host in reserver.deployment.nodes:
-        command = 'rsync -az {} {}:{}'.format(data, host, loc.get_node_local_ssd_dir())
-        command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__'])
-        if skip:
-            command+= '--ignore-existing'
-        executors.append(Executor(command, shell=True))
-    Executor.run_all(executors)
-    state = Executor.wait_all(executors, stop_on_error=False)
+
+    if deploy_mode == DeployMode.STANDARD: 
+        # We already collected the data in our data dir on the NFS mount, so no need to copy again
+        state = True
+    else:
+        target_dir = get_node_data_dir(deploy_mode)
+
+        for host in reserver.deployment.nodes:
+            command = 'rsync -az {} {}:{}'.format(data, host, target_dir)
+            command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__'])
+            if skip:
+                command+= '--ignore-existing'
+            executors.append(Executor(command, shell=True))
+        Executor.run_all(executors)
+        state = Executor.wait_all(executors, stop_on_error=False)
     if state:
         prints('Export success!')
     else:
@@ -149,7 +157,7 @@ def _deploy_data_internal(datalist, skip):
     return state
     
 
-def _deploy_data(datalist, skip):
+def _deploy_data(datalist, deploy_mode, skip):
     for location in datalist:
         glob_locs = glob.glob(location)
         for glob_loc in glob_locs:
@@ -169,7 +177,7 @@ def _deploy_data(datalist, skip):
         printe('Export failure!')
         return False
     
-    program = '{} --internal {}'.format(data, '--skip' if skip else '')
+    program = '{} --internal --deploy-mode {} {}'.format(data, deploy_mode, '--skip' if skip else '')
     command = 'ssh {} "python3 {}/main.py deploy data {}"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir(), program)
     print('TMP: command: {}'.format(command))
     print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
@@ -208,6 +216,7 @@ def subparser(subparsers):
 
     deploydataparser = subsubparsers.add_parser('data', help='Deploy data (use deploy start -h to see more...)')
     deploydataparser.add_argument('data', nargs='+', metavar='file', help='Files to place on reserved nodes local drive')
+    deploydataparser.add_argument('-dm', '--deploy-mode', type=str, metavar='mode', default=str(DeployMode.STANDARD), help='Deployment mode for data', choices=[str(x) for x in DeployMode])
     deploydataparser.add_argument('--skip', help='Skip data if already found on remote', action='store_true')
     deploydataparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
     
@@ -238,9 +247,9 @@ def deploy(parsers, args):
             return _deploy_application(jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir)
     elif args.subcommand == 'data':
         if args.internal:
-            return _deploy_data_internal(args.data, args.skip)
+            return _deploy_data_internal(args.data, args.deploy_mode, args.skip)
         else:
-            return _deploy_data(args.data, args.skip)
+            return _deploy_data(args.data, args.deploy_mode, args.skip)
     elif args.subcommand == 'meta':
         _deploy_meta()
 

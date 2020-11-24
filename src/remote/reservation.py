@@ -39,7 +39,7 @@ class Reserver(object):
                     print_start
                 time.sleep(1)
             prints('Reservation ready!')
-        
+
     # Stops reservation
     def stop(self):
         if self._reservation_number == None:
