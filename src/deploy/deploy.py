@@ -20,7 +20,10 @@ import util.ui as ui
 
 def _args_replace(args, timestamp, no_result=False):    
     tmp1 = args if no_result else args.replace('[[RESULTDIR]]', fs.join(loc.get_metaspark_results_dir(), timestamp))
-    return tmp1.replace('[[DATADIR]]', loc.get_node_local_ssd_dir())
+    tmp1 = tmp1.replace('[[DATA-STANDARDDIR]]', loc.get_node_data_dir(DeployMode.STANDARD))
+    tmp1 = tmp1.replace('[[DATA-LOCALDIR]]', loc.get_node_data_dir(DeployMode.LOCAL))
+    tmp1 = tmp1.replace('[[DATA-LOCAL-SSDDIR]]', loc.get_node_data_dir(DeployMode.LOCAL_SSD))
+    return tmp1.replace('[[DATA-RAMDIR]]', loc.get_node_data_dir(DeployMode.RAM))
 
 
 def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
@@ -140,7 +143,7 @@ def _deploy_data_internal(datalist, deploy_mode, skip):
         # We already collected the data in our data dir on the NFS mount, so no need to copy again
         state = True
     else:
-        target_dir = get_node_data_dir(deploy_mode)
+        target_dir = loc.get_node_data_dir(deploy_mode)
 
         for host in reserver.deployment.nodes:
             command = 'rsync -az {} {}:{}'.format(data, host, target_dir)

@@ -80,7 +80,7 @@ def resolve2(minVersion, maxVersion, path=_get_shell_java_path()):
         for item in fs.ls(p, only_dirs=True, full_paths=True):
             if fs.basename(item).startswith('java-') or 'openjdk' in fs.basename(item): #candidate found
                 version = _dirname_to_version(fs.basename(item))
-                if version < minVersion or java_version > maxVersion:
+                if version < minVersion or version > maxVersion:
                     continue
                 if (not fs.isdir(item, 'bin')) or (not fs.isfile(item, 'bin', 'java')) or not fs.isfile(item, 'bin', 'javac'):
                     continue
@@ -112,7 +112,9 @@ def check_version(minVersion=11, maxVersion=11):
                 if _write_bashrc('export JAVA_HOME={}\n'.format(path), question='Export found location "{}" to your .bashrc?'.format(path)):
                     exported = True
                     break
-        if not exported:
+        if exported:
+            return True
+        else:
             printe('Unable to detect valid JAVA_HOME. Set JAVA_HOME yourself.')
             print('Note: Java is commonly installed in /usr/lib/jvm/...')
             return False

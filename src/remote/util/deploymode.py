@@ -8,8 +8,8 @@ class DeployMode(Enum):
     RAM = 3      # on /dev/shm or /run/shm
 
     @staticmethod
-    def interpret_deploymode(deploymode):
-        d = deploymode.strip().lower()
+    def interpret(string):
+        d = string.strip().lower()
         if d == 'standard':
             return DeployMode.STANDARD
         elif d == 'local':
@@ -19,7 +19,7 @@ class DeployMode(Enum):
         elif d == 'ram' or d == 'ramdisk':
             return DeployMode.RAM
         else:
-            raise RuntimeError('Could not determine DeployMode for user argument "{}"'.format(deploymode))
+            raise RuntimeError('Could not determine DeployMode for user argument "{}"'.format(string))
 
     def __str__(self):
         return self.name.lower()

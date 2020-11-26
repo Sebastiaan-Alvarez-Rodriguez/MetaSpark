@@ -142,7 +142,7 @@ def start(time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact
     if not cluster_cfg:
         return False
 
-    deploy_mode = DeployMode.interpret_deploy_mode(deploy_mode)
+    deploy_mode = DeployMode.interpret(deploy_mode)
 
 
     nodes = cluster_cfg.nodes + 1 # We always want 1 node for the spark master alone

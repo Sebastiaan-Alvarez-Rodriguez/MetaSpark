@@ -9,7 +9,7 @@ import time
 
 from config.meta import cfg_meta_instance as metacfg
 from remote.reservation import Reserver
-import remote.util.deploymode as DeployMode
+from remote.util.deploymode import DeployMode
 import util.fs as fs
 import util.location as loc
 
@@ -25,7 +25,9 @@ class MetaDeploy(object):
     '''Object to dynamically pass to meta deployment setups'''
     
     def __init__(self):
-        self._deploymode = None
+        # We store the deploymode last used to start clusters, 
+        # so we can clean the junk dir in the right location
+        self._deploymode = None 
     '''
     Block for given command
     Command must return a MetaDeployState, optionally with an additional value
@@ -76,7 +78,7 @@ class MetaDeploy(object):
     We try to boot the cluster for retries retries. If we fail, we first sleep retry_sleep_time before retrying.
     '''
     def cluster_start(self, time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact, retries=5, retry_sleep_time=5):
-        self._deploymode = DeployMode.interpret_deploymode(deploy_mode)
+        self._deploymode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
         from main import start
         for x in range(retries):
             if start(time_to_reserve, config_filename, debug_mode, str(self._deploymode), no_interact):
@@ -154,9 +156,11 @@ class MetaDeploy(object):
     retries for trying to deploy the application. If we fail, we first sleep retry_sleep_time before retrying.
     '''
     def deploy_data(self, datalist, deploy_mode, skip, retries=5, retry_sleep_time=5):
+        dmode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
+
         from deploy.deploy import _deploy_data_internal
         for x in range(retries):
-            if _deploy_data_internal(datalist, deploy_mode, skip):
+            if _deploy_data_internal(datalist, dmode, skip):
                 return True
             time.sleep(retry_sleep_time)
         return False
