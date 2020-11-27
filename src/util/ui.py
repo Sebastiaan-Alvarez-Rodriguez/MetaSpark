@@ -93,7 +93,6 @@ def ask_pick_multiple(question, options: list, minimal=1):
     if minimal < 0 or minimal > len(options):
         raise RuntimeError('Cannot pick {} options in a list of size {}'.format(minimal, len(options)))
     while True:
-        print('I have options: {}'.format(options))
         for idx, x in enumerate(options):
             print('[{}] - {}'.format(idx, x))
         

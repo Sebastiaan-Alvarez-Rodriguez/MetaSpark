@@ -45,7 +45,7 @@ Provide
     execute:        Function executes boot command and returns state_ok (a bool) if True,
                     otherwise returns Executor to boot slave, which you have to execute to deploy slave
 '''
-def boot_slave(node, master_node, master_port=7077, debug_mode=False, deploy_mode=False, execute=True):
+def boot_slave(node, master_node, master_port=7077, debug_mode=False, deploy_mode=DeployMode.STANDARD, execute=True):
     scriptloc = fs.join(loc.get_spark_sbin_dir(), 'start-slave.sh')
     master_url = 'spark://{}:{}'.format(master_node, master_port)
 

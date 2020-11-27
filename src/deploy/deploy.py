@@ -137,7 +137,6 @@ def _deploy_data_internal(datalist, deploy_mode, skip):
     except Exception as e:
         printe('Reservation file found, no longer active')
         return False
-    executors = []
 
     if deploy_mode == DeployMode.STANDARD: 
         # We already collected the data in our data dir on the NFS mount, so no need to copy again
@@ -145,14 +144,20 @@ def _deploy_data_internal(datalist, deploy_mode, skip):
     else:
         target_dir = loc.get_node_data_dir(deploy_mode)
 
+        mkdir_executors = []
+        executors = []
         for host in reserver.deployment.nodes:
-            command = 'rsync -az {} {}:{}'.format(data, host, target_dir)
+            mkdir_executors.append(Executor('ssh {} "mkdir -p {}"'.format(host, target_dir), shell=True))
+
+            command = 'rsync -az {} {}'.format(data, target_dir)
             command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__'])
             if skip:
                 command+= '--ignore-existing'
-            executors.append(Executor(command, shell=True))
+            executors.append(Executor('ssh {} "{}"'.format(host, command), shell=True))
+        Executor.run_all(mkdir_executors)
+        state = Executor.wait_all(mkdir_executors, stop_on_error=False)
         Executor.run_all(executors)
-        state = Executor.wait_all(executors, stop_on_error=False)
+        state &= Executor.wait_all(executors, stop_on_error=False)
     if state:
         prints('Export success!')
     else:

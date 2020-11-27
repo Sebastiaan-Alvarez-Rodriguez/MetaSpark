@@ -54,11 +54,11 @@ def get_spark_work_dir(deploy_mode):
     if deploy_mode == DeployMode.STANDARD:
         return fs.join(get_spark_dir(), 'work')
     elif deploy_mode == DeployMode.LOCAL:
-        return fs.join(get_node_local_dir(), metacfg.ssh.ssh_user_name, 'work')
+        return fs.join(get_node_local_dir(), 'work')
     elif deploy_mode == DeployMode.LOCAL_SSD:
-        return fs.join(get_node_local_ssd_dir(), metacfg.ssh.ssh_user_name, 'work')
+        return fs.join(get_node_local_ssd_dir(), 'work')
     elif deploy_mode == DeployMode.RAM:
-        return fs.join(get_node_ram_dir(), metacfg.ssh.ssh_user_name, 'work')
+        return fs.join(get_node_ram_dir(), 'work')
     else:
         raise RuntimeError('Could not find a workdir destination for deploymode: {}'.format(deploy_mode))
 
@@ -90,14 +90,17 @@ def get_node_local_dir():
 def get_node_local_ssd_dir():
     return '/local-ssd/{}/'.format(metacfg.ssh.ssh_user_name)
 
+def get_node_ram_dir():
+    return '/dev/shm/{}/'.format(metacfg.ssh.ssh_user_name)
+
 def get_node_data_dir(deploy_mode):
     if deploy_mode == DeployMode.STANDARD:
         return get_metaspark_data_dir()
     elif deploy_mode == DeployMode.LOCAL:
-        return fs.join(get_node_local_dir(), metacfg.ssh.ssh_user_name, 'data')
+        return fs.join(get_node_local_dir(), 'data')
     elif deploy_mode == DeployMode.LOCAL_SSD:
-        return fs.join(get_node_local_ssd_dir(), metacfg.ssh.ssh_user_name, 'data')
+        return fs.join(get_node_local_ssd_dir(), 'data')
     elif deploy_mode == DeployMode.RAM:
-        return fs.join(get_node_ram_dir(), metacfg.ssh.ssh_user_name, 'data')
+        return fs.join(get_node_ram_dir(), 'data')
     else:
         raise RuntimeError('Could not find a datadir destination for deploymode: {}'.format(deploy_mode))

@@ -10,8 +10,10 @@ import time
 from config.meta import cfg_meta_instance as metacfg
 from remote.reservation import Reserver
 from remote.util.deploymode import DeployMode
+from util.executor import Executor
 import util.fs as fs
 import util.location as loc
+from util.printer import *
 
 class MetaDeployState(Enum):
     '''Possible deployment states'''
@@ -157,10 +159,10 @@ class MetaDeploy(object):
     '''
     def deploy_data(self, datalist, deploy_mode, skip, retries=5, retry_sleep_time=5):
         dmode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
-
+        dlist = listdatalist if isinstance(datalist, list) else [datalist]
         from deploy.deploy import _deploy_data_internal
         for x in range(retries):
-            if _deploy_data_internal(datalist, dmode, skip):
+            if _deploy_data_internal(dlist, dmode, skip):
                 return True
             time.sleep(retry_sleep_time)
         return False
