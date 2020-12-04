@@ -126,7 +126,7 @@ def _deploy_application(jarfile, mainclass, args, extra_jars, submit_opts, no_re
     return os.system(command) == 0
 
 
-def _deploy_data_internal(datalist, deploy_mode, skip):
+def _deploy_data_internal(datalist, deploy_mode, skip, subpath=''):
     print('Synchronizing data to local nodes...')
     data = ' '.join(datalist)
     try:
@@ -142,7 +142,7 @@ def _deploy_data_internal(datalist, deploy_mode, skip):
         # We already collected the data in our data dir on the NFS mount, so no need to copy again
         state = True
     else:
-        target_dir = loc.get_node_data_dir(deploy_mode)
+        target_dir = fs.join(loc.get_node_data_dir(deploy_mode), subpath)
 
         mkdir_executors = []
         executors = []
@@ -152,7 +152,7 @@ def _deploy_data_internal(datalist, deploy_mode, skip):
             command = 'rsync -az {} {}'.format(data, target_dir)
             command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__'])
             if skip:
-                command+= '--ignore-existing'
+                command+= ' --ignore-existing'
             executors.append(Executor('ssh {} "{}"'.format(host, command), shell=True))
         Executor.run_all(mkdir_executors)
         state = Executor.wait_all(mkdir_executors, stop_on_error=False)

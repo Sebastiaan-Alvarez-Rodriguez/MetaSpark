@@ -37,7 +37,7 @@ class Experiment(object):
 def load_experiment(picked):
     item = picked if picked.endswith('.py') else '{}.py'.format(picked)
 
-    if not fs.is_file(loc.get_metaspark_experiments_dir(), item):
+    if not fs.isfile(loc.get_metaspark_experiments_dir(), item):
         printe('Could not find provided experiment "{}" in experiment location: {}'.format(item, loc.get_metaspark_experiments_dir()))
         return None
 

@@ -104,7 +104,7 @@ class MetaDeploy(object):
 
 
     # Remove junk generated during each run. Please use this between runs, not in a run
-    def clean_junk(self, fast=False):
+    def clean_junk(self, fast=False, datadir=None):
         if self._deploymode == None: # We don't know where to clean. Clean everywhere
             workdirs = ' '.join([loc.get_spark_work_dir(val) for val in DeployMode])
             fast = False # we don't know the node numbers!
@@ -120,8 +120,11 @@ class MetaDeploy(object):
             nfs_log = loc.get_spark_logs_dir()
             log_command = 'rm -rf {}'.format(nfs_log)
             executors.append(Executor(log_command, shell=True))
+            datadir = '' if datadir == None else datadir
+
             for x in self._deployment.nodes:
-                clean_command = 'ssh {} "rm -rf {} {}"'.format(x, workdirs, nfs_log)
+                clean_command = 'ssh {} "rm -rf {} {} {}"'.format(x, workdirs, nfs_log, datadir)
+
                 executors.append(Executor(clean_command, shell=True))
             Executor.run_all(executors)
             state = Executor.wait_all(executors, stop_on_error=False)
@@ -151,18 +154,28 @@ class MetaDeploy(object):
 
 
     '''
+    Make a number of directories on the remote hosts.
+    dirs List of directories. If you have only 1 dir to make, provide singleton list
+    '''
+    def deploy_mkdirs(self, dirs):
+        all_dirs = ' '.join(dirs)
+        command = 'ssh {} "mkdir -p {}"'.format(metacfg.ssh.ssh_key_name, all_dirs)
+        return os.system(command) == 0
+
+    '''
     Deploy data on the local drive of a node. We require:
     datalist the files/directories to deploy, as a list of string filenames (which exist in <project root>/data/),
     deploy_mode the deploy-mode for the data. Determines whether we place data on the NFS mount, local disk, RAMdisk etc,
     skip value (if True, we skip copying data that already exists in a particular node's local drive),
+    subpath the extra path to append to the rsync target location
     retries for trying to deploy the application. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def deploy_data(self, datalist, deploy_mode, skip, retries=5, retry_sleep_time=5):
+    def deploy_data(self, datalist, deploy_mode, skip, subpath='', retries=5, retry_sleep_time=5):
         dmode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
         dlist = listdatalist if isinstance(datalist, list) else [datalist]
         from deploy.deploy import _deploy_data_internal
         for x in range(retries):
-            if _deploy_data_internal(dlist, dmode, skip):
+            if _deploy_data_internal(dlist, dmode, skip, subpath=subpath):
                 return True
             time.sleep(retry_sleep_time)
         return False
