@@ -32,6 +32,23 @@ class Experiment(object):
         return self.instance.stop(self._metaDeploy)
 
 
+# Load experiment. Assumes 'picked' is a string for 1 experiment, relative to <project root>/experiments/
+# Returns None on failure, a singleton list containing the Experiment on success
+def load_experiment(picked):
+    item = picked if picked.endswith('.py') else '{}.py'.format(picked)
+
+    if not fs.is_file(loc.get_metaspark_experiments_dir(), item):
+        printe('Could not find provided experiment "{}" in experiment location: {}'.format(item, loc.get_metaspark_experiments_dir()))
+        return None
+
+    item = fs.join(loc.get_metaspark_experiments_dir(), item)
+    try:
+        module = imp.import_full_path(item)
+        return [Experiment(item, module.get_experiment())]
+    except AttributeError:
+        printe('Picked experiment at {} had no get_experiment()!'.format(item))
+        return None
+
 # Standalone function to get an experiment instance
 def get_experiments():
     candidates = []

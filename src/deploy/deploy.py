@@ -128,7 +128,7 @@ def _deploy_application(jarfile, mainclass, args, extra_jars, submit_opts, no_re
 
 def _deploy_data_internal(datalist, deploy_mode, skip):
     print('Synchronizing data to local nodes...')
-    data = ' '.join([fs.join(loc.get_metaspark_data_dir(), fs.basename(x)) for x in datalist])
+    data = ' '.join(datalist)
     try:
         reserver = Reserver.load()
     except FileNotFoundError as e:
@@ -185,19 +185,23 @@ def _deploy_data(datalist, deploy_mode, skip):
         printe('Export failure!')
         return False
     
-    program = '{} --internal --deploy-mode {} {}'.format(data, deploy_mode, '--skip' if skip else '')
+    remote_datalist = [fs.join(loc.get_remote_metaspark_data_dir(), x) for x in datalist]
+    program = '{} --internal --deploy-mode {} {}'.format(' '.join(remote_datalist), deploy_mode, '--skip' if skip else '')
     command = 'ssh {} "python3 {}/main.py deploy data {}"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir(), program)
     print('TMP: command: {}'.format(command))
     print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
     return os.system(command) == 0
 
 
-def _deploy_meta():
-    try:
-        experiments = exp.get_experiments()
-    except RuntimeError as e:
-        printe('Could not find an experiment to run. Please make an experiment in {}. See the README.md for more info.'.format(loc.get_metaspark_experiments_dir()))
-        return False
+def _deploy_meta(experiment):
+    if experiment == None:
+        try:
+            experiments = exp.get_experiments()
+        except RuntimeError as e:
+            printe('Could not find an experiment to run. Please make an experiment in {}. See the README.md for more info.'.format(loc.get_metaspark_experiments_dir()))
+            return False
+    else:
+        experiments = exp.load_experiment(experiment)
     for idx, x in enumerate(experiments):
         print('Starting experiment {}'.format(idx))
         if x.start():
@@ -229,6 +233,7 @@ def subparser(subparsers):
     deploydataparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
     
     deploymetaparser = subsubparsers.add_parser('meta', help='Deploy applications with all variations of given parameters')
+    deploymetaparser.add_argument('-e', '--experiment', type=str, metavar='experiment', help='Experiment to pick')
     deploymetaparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
 
     return deployparser, deployapplparser, deploymetaparser, deploydataparser
@@ -259,7 +264,7 @@ def deploy(parsers, args):
         else:
             return _deploy_data(args.data, args.deploy_mode, args.skip)
     elif args.subcommand == 'meta':
-        _deploy_meta()
+        _deploy_meta(args.experiment)
 
     else:
         deployparser.print_help()
