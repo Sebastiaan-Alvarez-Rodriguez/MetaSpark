@@ -150,7 +150,7 @@ def _deploy_data_internal(datalist, deploy_mode, skip, subpath=''):
             mkdir_executors.append(Executor('ssh {} "mkdir -p {}"'.format(host, target_dir), shell=True))
 
             command = 'rsync -az {} {}'.format(data, target_dir)
-            command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__'])
+            command+= ' --exclude '+' --exclude '.join(['.git', '__pycache__', '*.crc'])
             if skip:
                 command+= ' --ignore-existing'
             executors.append(Executor('ssh {} "{}"'.format(host, command), shell=True))
@@ -188,12 +188,11 @@ def _deploy_data(datalist, deploy_mode, skip):
     remote_datalist = [fs.join(loc.get_remote_metaspark_data_dir(), x) for x in datalist]
     program = '{} --internal --deploy-mode {} {}'.format(' '.join(remote_datalist), deploy_mode, '--skip' if skip else '')
     command = 'ssh {} "python3 {}/main.py deploy data {}"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir(), program)
-    print('TMP: command: {}'.format(command))
     print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
     return os.system(command) == 0
 
 
-def _deploy_meta(experiment):
+def _deploy_meta_internal(experiment):
     if experiment == None:
         try:
             experiments = exp.get_experiments()
@@ -211,6 +210,12 @@ def _deploy_meta(experiment):
         x.stop()
         print('Experiment {} stopped'.format(idx))
     return True
+
+def _deploy_meta(experiment):
+    program = '--internal {}'.format(('-e '+experiment) if experiment != None else '')
+    command = 'ssh {} "python3 {}/main.py deploy meta {}"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir(), program)
+    print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
+    return os.system(command) == 0
 
 # Register 'deploy' subparser modules
 def subparser(subparsers):
@@ -264,7 +269,9 @@ def deploy(parsers, args):
         else:
             return _deploy_data(args.data, args.deploy_mode, args.skip)
     elif args.subcommand == 'meta':
-        _deploy_meta(args.experiment)
-
+        if args.internal:
+            _deploy_meta_internal(args.experiment)
+        else:
+            _deploy_meta(args.experiment)
     else:
         deployparser.print_help()
