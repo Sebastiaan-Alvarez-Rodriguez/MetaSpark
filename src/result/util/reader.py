@@ -75,9 +75,9 @@ class Frame(object):
             lines = lines[:-1]
         if skip_initial:
             lines = lines[2:]
-        itimes = [int(x.split(', ')[0]) for x in lines]
-        ctimes = [int(x.split(', ')[1]) for x in lines]
-        answers= [int(x.split(', ')[2]) for x in lines]
+        ptimes = [int(x.split(',', 1)[0]) for x in lines[::2]]
+        itimes = [int(x.split(',', 2)[1-(idx % 2)]) for idx, x in enumerate(lines)]
+        ctimes = [int(x.split(',', 2)[2-(idx % 2)]) for idx, x in enumerate(lines)]
 
         # Identifiers
         self.partition = int(partition)
@@ -86,14 +86,14 @@ class Frame(object):
         self.kind = kind
         self.rb = int(rb)
 
+        self.ds_p_arr = np.array(ptimes[::2])
+
         self.ds_i_arr = np.array(itimes[::2])
         self.spark_i_arr = np.array(itimes[1::2])
 
         self.ds_c_arr = np.array(ctimes[::2])
         self.spark_c_arr = np.array(ctimes[1::2])
-        
-        self.ds_a_arr = np.array(answers[::2])
-        self.spark_a_arr = np.array(answers[1::2])
+
 
     def __len__(self):
         return self.size
@@ -111,6 +111,11 @@ class Frame(object):
         return len(self.spark_i_arr)
 
         
+    # Dataset total times spent in locations
+    @property
+    def ds_p_time(self):
+        return float(np.sum(self.ds_p_arr)) / 1000000000
+
     @property
     def ds_i_time(self):
         return float(np.sum(self.ds_i_arr)) / 1000000000
@@ -123,6 +128,7 @@ class Frame(object):
     def ds_total_time(self):
         return self.ds_i_time+self.ds_c_time
     
+    # Spark total times spent in locations
     @property
     def spark_i_time(self):
         return float(np.sum(self.spark_i_arr)) / 1000000000
@@ -135,6 +141,11 @@ class Frame(object):
     def spark_total_time(self):
         return self.spark_i_time+self.spark_c_time
     
+    # Dataset average times spent in locations
+    @property
+    def ds_p_avgtime(self):
+        return np.average(self.ds_p_arr) / 1000000000
+     
     @property
     def ds_i_avgtime(self):
         return np.average(self.ds_i_arr) / 1000000000
@@ -147,6 +158,7 @@ class Frame(object):
     def ds_total_avgtime(self):
         return self.ds_i_avgtime+self.ds_c_avgtime
     
+    # Spark average times spent in locations
     @property
     def spark_i_avgtime(self):
         return np.average(self.spark_i_arr) / 1000000000
@@ -158,13 +170,3 @@ class Frame(object):
     @property
     def spark_total_avgtime(self):
         return self.spark_i_avgtime+self.spark_c_avgtime
-    
-    @property
-    def ds_incorrect(self):
-        correct_ans = self.amount*(self.amount-1)/2
-        return len([x for x in self.ds_a_arr if x != correct_ans])
-
-    @property
-    def spark_incorrect(self):
-        correct_ans = self.amount*(self.amount-1)/2
-        return len([x for x in self.spark_a_arr if x != correct_ans])

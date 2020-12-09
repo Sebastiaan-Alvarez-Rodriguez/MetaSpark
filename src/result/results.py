@@ -123,8 +123,8 @@ def results(parser, args):
             import result.filter.barplot as b
             b.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         elif args.type == 'generic':
-            import result.filter.generic as f
-            f.stats(args.data, *(fdata+[args.skip_initial]))
+            import result.filter.generic as g
+            g.stats(args.data, *(fdata+[args.skip_initial]))
         elif args.type == 'line':
             import result.filter.line as l
             l.stats(args.data, *(fdata+fargs+[args.skip_initial]))    

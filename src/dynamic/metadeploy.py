@@ -152,15 +152,30 @@ class MetaDeploy(object):
             time.sleep(retry_sleep_time)
         return False
 
+    '''
+    Deploy an application (which is not a Spark application) on all nodes to run in parallel.
+    Useful to e.g. generate data
+    '''
+    def deploy_nonspark_application(self, command):
+        try:
+            reserver = Reserver.load()
+        except FileNotFoundError as e:
+            printe('No reservation found on remote. Cannot run!')
+            return False
+        except Exception as e:
+            printe('Reservation file found, no longer active')
+            return False
+        executors = []
+        for host in reserver.deployment.nodes:
+            executors.append(Executor('ssh {} "{}"'.format(host, command), shell=True))
+        Executor.run_all(executors)
+        state = Executor.wait_all(executors, stop_on_error=False)
+        if state:
+            prints('Export success!')
+        else:
+            printe('Export failure!')
+        return state
 
-    '''
-    Make a number of directories on the remote hosts.
-    dirs List of directories. If you have only 1 dir to make, provide singleton list
-    '''
-    def deploy_mkdirs(self, dirs):
-        all_dirs = ' '.join(dirs)
-        command = 'ssh {} "mkdir -p {}"'.format(metacfg.ssh.ssh_key_name, all_dirs)
-        return os.system(command) == 0
 
     '''
     Deploy data on the local drive of a node. We require:

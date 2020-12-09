@@ -100,7 +100,7 @@ def init():
     return False
 
 # Handles remote commandline argument
-def remote_start(time_to_reserve, config_filename, debug_mode, fast, force_exp, no_interact):
+def remote_start(time_to_reserve, config_filename, debug_mode, deploy_mode, force_exp, no_interact):
     if force_exp and not export(full_exp=True):
         printe('Could not export data')
         return False
@@ -109,7 +109,7 @@ def remote_start(time_to_reserve, config_filename, debug_mode, fast, force_exp, 
     if not config:
         return False
 
-    program = 'start -c {} -t {}'.format(fs.basename(config.path), time_to_reserve)+(' -d' if debug_mode else '')+(' -f' if fast else '') + (' -ni' if no_interact else '')
+    program = 'start -c {} -t {} -dm {}'.format(fs.basename(config.path), time_to_reserve, deploy_mode)+(' -d' if debug_mode else '')+ (' -ni' if no_interact else '')
 
     command = 'ssh {} "python3 {}/main.py {}"'.format(
         metacfg.ssh.ssh_key_name,
