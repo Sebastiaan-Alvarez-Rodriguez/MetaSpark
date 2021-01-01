@@ -38,11 +38,11 @@ def merge(data, skip_initial=True):
 
     datapath = fs.join(loc.get_metaspark_results_dir(), data)
     merges = 0
-    for dpartition in sorted(fs.ls(datapath, only_dirs=True), key=lambda x: int(x)):
-        for dextension in fs.ls(fs.join(datapath, dpartition), only_dirs=True):
-            for damount in sorted(fs.ls(fs.join(datapath, dpartition, dextension), only_dirs=True), key=lambda x: int(x)):
-                for dkind in fs.ls(fs.join(datapath, dpartition, dextension, damount), only_dirs=True):
-                    flist = sorted([x for x in fs.ls(fs.join(datapath, dpartition, dextension, damount, dkind), only_files=True, full_paths=True) if x.split('.')[-1].startswith('res')], key=lambda x: filename_to_rb(x)+len(x))
+    for dnode in sorted(fs.ls(datapath, only_dirs=True), key=lambda x: int(x)):
+        for dextension in fs.ls(fs.join(datapath, dnode), only_dirs=True):
+            for damount in sorted(fs.ls(fs.join(datapath, dnode, dextension), only_dirs=True), key=lambda x: int(x)):
+                for dkind in fs.ls(fs.join(datapath, dnode, dextension, damount), only_dirs=True):
+                    flist = sorted([x for x in fs.ls(fs.join(datapath, dnode, dextension, damount, dkind), only_files=True, full_paths=True) if x.split('.')[-1].startswith('res')], key=lambda x: filename_to_rb(x)+len(x))
                     if len(flist) == 0:
                         continue
                     fbase = flist[0]
@@ -60,7 +60,8 @@ def merge(data, skip_initial=True):
 def _filterparser(subsubparsers):
     filterparser = subsubparsers.add_parser('filter', help='Display generic info, based on filters')
 
-    filterparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partition filters')
+    filterparser.add_argument('-n', '--node', nargs='+', metavar='filter', help='Node filters')
+    filterparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partitions-per-node filters')
     filterparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
     filterparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
     filterparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
@@ -118,7 +119,7 @@ def results(parser, args):
 
 
     if args.subcommand == 'filter':
-        fdata = [args.partition, args.extension, args.amount, args.kind, args.readbuffer]
+        fdata = [args.node, args.partition, args.extension, args.amount, args.kind, args.readbuffer]
         if args.type == 'barplot':
             import result.filter.barplot as b
             b.stats(args.data, *(fdata+fargs+[args.skip_initial]))

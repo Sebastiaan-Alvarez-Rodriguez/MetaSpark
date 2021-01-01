@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+from result.util.dimension import Dimension
 from result.util.reader import Reader
 import result.util.storer as storer
 import util.fs as fs
@@ -8,29 +9,12 @@ import util.location as loc
 
 # https://matplotlib.org/3.1.1/gallery/lines_bars_and_markers/bar_stacked.html
 
-def open_var(partition, extension, amount, kind, rb):
-    if partition == None:
-        return 'partition'
-    elif extension == None:
-        return 'extension'
-    elif amount == None:
-        return 'amount'
-    elif kind == None:
-        return 'kind'
-    elif rb == None:
-        return 'rb'
-    raise RuntimeError('No open vars found')
-
-
-def num_open_vars(partition, extension, amount, kind, rb):
-    return [partition, extension, amount, kind, rb].count(None)
-
 # Plots execution time, using provided filters
-def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
-    if num_open_vars(partition, extension, amount, kind, rb) > 1:
-        print('Too many open variables!')
+    if Dimension.num_open_vars(node, partitions_per_node, extension, amount, kind, rb) > 1:
+        print('Too many open variables: {}'.format(', '.join(Dimension.open_vars(node, partitions_per_node, extension, amount, kind, rb))))
         return
 
         if large:
@@ -43,7 +27,7 @@ def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, sto
             plt.rc('font', **font)
         
 
-    ovar = open_var(partition, extension, amount, kind, rb)
+    ovar = Dimension.open_vars(node, partitions_per_node, extension, amount, kind, rb)[0]
 
     reader = Reader(path)
     fig, ax = plt.subplots(2)
@@ -55,7 +39,8 @@ def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, sto
     i_arr1 = []
     c_arr1 = []
     xticks1 = []
-    for frame in reader.read_ops(partition, extension, amount, kind, rb):
+    hits = 0
+    for frame in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
         # BAR1loc
         i_arr0.append(np.average(frame.ds_i_avgtime))
         c_arr0.append(np.average(frame.ds_c_avgtime))
@@ -64,8 +49,11 @@ def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, sto
         i_arr1.append(np.average(frame.spark_i_avgtime))
         c_arr1.append(np.average(frame.spark_c_avgtime))
         xticks1.append(getattr(frame, ovar))
-        
-        
+        hits +=1
+
+    if hits == 0:
+        print('No results to plot. Exiting now...')
+        return
 
     ind = np.arange(len(i_arr0))
     width = 0.35
@@ -79,12 +67,12 @@ def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, sto
     plt.sca(ax[1])
     plt.xticks(ind, xticks1)
 
-    ax[0].set(ylabel='Average Execution Time (s)', title='Execution Time Composition for Dataset')
+    ax[0].set(ylabel='Average Execution Time (s)', title='Execution Time Composition for Arrow-Spark')
     ax[1].set(ylabel='Average Execution Time (s)', title='Execution Time Composition for Spark')
         
     # ax[1].plot(list(range(10)), list(range(10)), label='Spark')
 
-    # ax[0].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Dataset')
+    # ax[0].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Arrow-Spark')
     # if large:
     #     fig.legend(loc='right', fontsize=18, frameon=False)
     # else:
