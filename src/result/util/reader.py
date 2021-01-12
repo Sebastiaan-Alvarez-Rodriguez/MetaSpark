@@ -14,7 +14,7 @@ class Reader(object):
     '''
     Object to read data from a path.
     Directory structure is assumed to be
-    <partition>/<extension>/<amount>/<kind>/<rb>/
+    <node>/<extension>/<amount>/<kind>/<rb>/
     
     Only reads files ending on '.res'.
     Reader is ignorant of all other files and directories
@@ -24,39 +24,43 @@ class Reader(object):
             raise RuntimeError('Cannot read data from path "{}"'.format(path_start))
         self.path = path_start
 
-    def _filter_files(self, partition=None, extension=None, amount=None, kind=None, rb=None):
+    def _filter_files(self, node=None, partitions_per_node=None, extension=None, amount=None, kind=None, rb=None):
         self.files = []
-        for dpartition in sorted(fs.ls(self.path, only_dirs=True), key=lambda x: int(x)):
-            if not _match(dpartition, partition):
-                # printw('Partition={} did not match filter={}'.format(dpartition, partition))
+        for dnode in sorted(fs.ls(self.path, only_dirs=True), key=lambda x: int(x)):
+            if not _match(dnode, node):
+                # printw('Node={} did not match filter={}'.format(dnode, node))
                 continue
-            for dextension in fs.ls(fs.join(self.path, dpartition), only_dirs=True):
-                if not _match(dextension, extension):
-                    # printw('Extension={} did not match filter={}'.format(dextension, extension))
+            for dpartitions_per_node in sorted(fs.ls(fs.join(self.path, dnode), only_dirs=True), key=lambda x: int(x)):
+                if not _match(dpartitions_per_node, partitions_per_node):
+                    # printw('PartitionsPerNode={} did not match filter={}'.format(dpartitions_per_node, partitions_per_node))
                     continue
-                for damount in sorted(fs.ls(fs.join(self.path, dpartition, dextension), only_dirs=True), key=lambda x: int(x)):
-                    if not _match(damount, amount):
-                        # printw('Amount={} did not match filter={}'.format(damount, amount))
+                for dextension in fs.ls(fs.join(self.path, dnode, dpartitions_per_node), only_dirs=True):
+                    if not _match(dextension, extension):
+                        # printw('Extension={} did not match filter={}'.format(dextension, extension))
                         continue
-                    for dkind in fs.ls(fs.join(self.path, dpartition, dextension, damount), only_dirs=True):
-                        if not _match(dkind, kind):
-                            # printw('Kind={} did not match filter={}'.format(dkind, kind))
+                    for damount in sorted(fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension), only_dirs=True), key=lambda x: int(x)):
+                        if not _match(damount, amount):
+                            # printw('Amount={} did not match filter={}'.format(damount, amount))
                             continue
-                        for outfile in sorted([x for x in fs.ls(fs.join(self.path, dpartition, dextension, damount, dkind), only_files=True, full_paths=True) if x.endswith('.res')], key=lambda x: filename_to_rb(x)):
-                            frb = filename_to_rb(outfile)
-                            if not _match(frb, rb):
+                        for dkind in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension, damount), only_dirs=True):
+                            if not _match(dkind, kind):
+                                # printw('Kind={} did not match filter={}'.format(dkind, kind))
                                 continue
-                            self.files.append(outfile)
+                            for outfile in sorted([x for x in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension, damount, dkind), only_files=True, full_paths=True) if x.endswith('.res')], key=lambda x: filename_to_rb(x)):
+                                frb = filename_to_rb(outfile)
+                                if not _match(frb, rb):
+                                    continue
+                                self.files.append(outfile)
         print('Matched {} files'.format(len(self.files)))
 
     # Lazily read and return data using a filter
     # Optionally filter the first 2 measurements, which are uncached
     # Data is provided as it0, ct0, a0, it1, ct1, a1
-    def read_ops(self, partition=None, extension=None, amount=None, kind=None, rb=None, skip_initial=True):
-        self._filter_files(partition, extension, amount, kind, rb)
+    def read_ops(self, node=None, partitions_per_node=None, extension=None, amount=None, kind=None, rb=None, skip_initial=True):
+        self._filter_files(node, partitions_per_node, extension, amount, kind, rb)
         for file in self.files:
             with open(file, 'r') as f:
-                identifiers = fs.dirname(file).split(fs.sep())[-4:] + [filename_to_rb(file)]
+                identifiers = fs.dirname(file).split(fs.sep())[-5:] + [filename_to_rb(file)]
                 yield Frame(*identifiers, f.readlines(), skip_initial)
 
     @property
@@ -70,7 +74,7 @@ class Frame(object):
     # Initialize a new frame.
     # If skip_initial is set, we skip the first 2 entries of lines.
     # This is useful, because the first 2 entries are without any cached values 
-    def __init__(self, partition, extension, amount, kind, rb, lines, skip_initial=True):
+    def __init__(self, node, partitions_per_node, extension, amount, kind, rb, lines, skip_initial=True):
         if len(lines) % 2 != 0:
             lines = lines[:-1]
         if skip_initial:
@@ -80,7 +84,8 @@ class Frame(object):
         ctimes = [int(x.split(',', 2)[2-(idx % 2)]) for idx, x in enumerate(lines)]
 
         # Identifiers
-        self.partition = int(partition)
+        self.node = int(node)
+        self.partitions_per_node = int(partitions_per_node)
         self.extension = extension
         self.amount = int(amount)
         self.kind = kind

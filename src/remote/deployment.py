@@ -13,9 +13,10 @@ class Deployment(object):
         self._nodes = None
         self._master_port = None
         if reservation_number != None:
-            raw_nodes = subprocess.check_output("preserve -llist | grep "+str(reservation_number)+" | awk -F'\\t' '{ print $NF }'", shell=True).decode('utf-8').strip().split()
-            raw_nodes.sort(key=lambda x: int(x[4:]))
-            self._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in raw_nodes] if infiniband else raw_nodes
+            self.raw_nodes = subprocess.check_output("preserve -llist | grep "+str(reservation_number)+" | awk -F'\\t' '{ print $NF }'", shell=True).decode('utf-8').strip().split()
+            self.raw_nodes.sort(key=lambda x: int(x[4:]))
+            self._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in self.raw_nodes] if infiniband else self.raw_nodes
+        self.infiniband = infiniband
 
     @property
     def nodes(self):
@@ -41,17 +42,27 @@ class Deployment(object):
     def slave_ips(self):
         return self._nodes[1:]
 
+    # Returns whether this host is the master node
+    def is_master(self):
+        return self.raw_nodes[0] == socket.gethostname()
+
+    # Returns the global id of this host
+    def get_gid(self):
+        return self.raw_nodes.index(socket.gethostname())
+
     # Save deployment to disk
     def persist(self, file):
         file.write(str(self._master_port)+'\n')
-        for x in self._nodes:
+        file.write(str(self.infiniband)+'\n')
+        for x in self.raw_nodes:
             file.write(x+'\n')
 
     # Load deployment from disk
     @staticmethod
     def load(file):
-        port = int(file.readline().strip())
         deployment = Deployment()
-        deployment._nodes = [x.strip() for x in file.readlines()]
-        deployment.master_port = port
+        deployment.master_port = int(file.readline().strip())
+        deployment.infiniband = file.readline.strip()=='True'
+        deployment.raw_nodes = [x.strip() for x in file.readlines()]
+        deployment._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in deployment.raw_nodes] if deployment.infiniband else deployment.raw_nodes
         return deployment

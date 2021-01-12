@@ -273,6 +273,7 @@ def main():
             retval = remote_stop()
         else:
             remoteparser.print_help()
+            retval = 1
     elif args.command == 'start' and args.internal:
         retval = _start_internal(args.internal[0], args.debug_mode)
     elif args.command == 'start':

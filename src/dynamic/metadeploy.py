@@ -140,14 +140,15 @@ class MetaDeploy(object):
     mainclass inside the jarfile,
     args for the jar (can be None),
     extra_jars (which exist in <project root>/jars/) to submit alongside the jarfile (can be None),
-    submit_opts extra options for spark-submit (for advanced users),
-    no_resultdir to indicate whether we should skip making a result directory or not,
+    submit_opts (str) extra options for spark-submit (for advanced users),
+    no_resultdir (bool) to indicate whether we should skip making a result directory or not,
+    flamegraph (str) to indicate whether we want to record data for a flamegraph (looks like 30s, 2m, 4h, can be None)
     retries for trying to deploy the application. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def deploy_application(self, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, retries=5, retry_sleep_time=5):
+    def deploy_application(self, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flamegraph=None, retries=5, retry_sleep_time=5):
         from deploy.deploy import _deploy_application_internal
         for x in range(retries):
-            if _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
+            if _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flamegraph!=None, flamegraph):
                 return True
             time.sleep(retry_sleep_time)
         return False

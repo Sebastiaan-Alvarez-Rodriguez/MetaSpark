@@ -7,6 +7,12 @@ from config.meta import cfg_meta_instance as metacfg
 from remote.util.deploymode import DeployMode
 
 #################### MetaSpark directories ####################
+def get_metaspark_cluster_conf_dir():
+    return fs.join(get_metaspark_conf_dir(), 'cluster')
+
+def get_metaspark_conf_dir():
+    return fs.join(fs.abspath(), 'conf')
+
 def get_metaspark_dep_dir():
     return fs.join(fs.abspath(), 'deps')
 
@@ -16,23 +22,20 @@ def get_metaspark_data_dir():
 def get_metaspark_experiments_dir():
     return fs.join(fs.abspath(), 'experiments')
 
-def get_metaspark_results_dir():
-    return fs.join(fs.abspath(), 'results')
-
 def get_metaspark_graphs_dir():
     return fs.join(fs.abspath(), 'graphs')
-
-def get_metaspark_conf_dir():
-    return fs.join(fs.abspath(), 'conf')
-
-def get_metaspark_cluster_conf_dir():
-    return fs.join(get_metaspark_conf_dir(), 'cluster')
 
 def get_metaspark_log4j_conf_dir():
     return fs.join(get_metaspark_conf_dir(), 'log4j')
 
 def get_metaspark_jar_dir():
     return fs.join(fs.abspath(), 'jars')
+
+def get_metaspark_results_dir():
+    return fs.join(fs.abspath(), 'results')
+
+def get_metaspark_recordings_dir():
+    return fs.join(fs.abspath(), 'recordings')
 
 #################### Spark directories ####################
 def get_spark_dir():

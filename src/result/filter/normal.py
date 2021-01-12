@@ -8,12 +8,12 @@ import util.fs as fs
 import util.location as loc
 
 # Plots normal distributions in one figure, using provided filters
-def stats(resultdir, partition, extension, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
     # print('When looking at the 32, pq, 10000, 20480*8 category:')
     reader = Reader(path)
-    for frame in reader.read_ops(partition, extension, amount, kind, rb):
+    for frame in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
         if large:
             fontsize = 24
             font = {
