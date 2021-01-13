@@ -5,6 +5,7 @@ import argparse
 import glob
 import os
 import socket
+import time
 
 from config.meta import cfg_meta_instance as metacfg
 import deploy.flamegraph as fg
@@ -86,13 +87,14 @@ def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_op
 
     if flame_graph:
         executors = []
+        base_recordpath = fs.join(loc.get_metaspark_recordings_dir(), tm.timestamp('%Y-%m-%d_%H:%M:%S.%f'))
+        fs.mkdir(base_recordpath, exist_ok=False)
         for host in reserver.deployment.nodes:
-            base_recordpath = fs.join(loc.get_metaspark_recordings_dir(), tm.timestamp('%Y-%m-%d_%H:%M:%S.%f'))
-            fs.mkdir(base_recordpath, exist_ok=False)
-            executors.append(Executor('ssh {} "python3 {}/main.py deploy flamegraph -t {} -o {}"'.format(host, fs.abspath(), flamegraph_duration, base_recordpath), shell=True))
+            flame_command = 'ssh {} "python3 {}/main.py deploy flamegraph -t {} -o {}"'.format(host, fs.abspath(), flame_graph_duration, base_recordpath)
+            executors.append(Executor(flame_command, shell=True))
         Executor.run_all(executors) # Connect to all nodes, start listening for correct pids
-        print('Listening started')
-        time.sleep(1) # Give executors some time to connect and start listening
+        print('Flamegraph reading set for {}. listening started...'.format(flame_graph_duration))
+        time.sleep(2) # Give executors some time to connect and start listening
     print('Executing command: {}'.format(command))
     status = os.system(command) == 0
     if status:
@@ -100,7 +102,7 @@ def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_op
     else:
         printe('There were errors during deployment.')
 
-    if flamegraph:
+    if flame_graph:
         Executor.wait_all(executors, stop_on_error=False)
     return status
 
@@ -118,16 +120,17 @@ def _flamegraph(flame_graph_duration, base_recordpath):
     designation = 'driver' if reserver.deployment.is_master() else 'worker'
     gid = reserver.deployment.get_gid()
     recordpath = fs.join(base_recordpath, designation+str(gid)+'.jfr')
-    print('Starting flamegraph measurement. Searching jPID with jps...')
     pid = None
     tries = 100
-    while pid == None or tries > 0:
+    while pid == None and tries > 0:
         pid = fg.find_proc_regex()
         tries -= 1
     if pid == None:
-        printw('Unable to find jPID, skipping flamegraph')
+        import socket
+        printw('{}: Unable to find jPID, skipping flamegraph'.format(socket.gethostname()))
+        return False
     else:
-        fg.launch_flightrecord(pid, recordpath, flame_graph_duration)
+        fg.launch_flightrecord(pid, recordpath, duration=flame_graph_duration)
         printc('Flight recording started, output will be at {}'.format(recordpath), Color.CAN)
     return True
 
@@ -199,9 +202,9 @@ def _deploy_data_internal(datalist, deploy_mode, skip, subpath=''):
         Executor.run_all(executors)
         state &= Executor.wait_all(executors, stop_on_error=False)
     if state:
-        prints('Export success!')
+        prints('Data deployment success!')
     else:
-        printe('Export failure!')
+        printw('Data deployment failure on some nodes!')
     return state
     
 
@@ -220,9 +223,9 @@ def _deploy_data(datalist, deploy_mode, skip):
     if skip:
         command+= '--ignore-existing'
     if os.system(command) == 0:
-        print('Export success!')
+        print('Data sync success!')
     else:
-        printe('Export failure!')
+        printe('Data sync failure!')
         return False
     
     remote_datalist = [fs.join(loc.get_remote_metaspark_data_dir(), x) for x in datalist]

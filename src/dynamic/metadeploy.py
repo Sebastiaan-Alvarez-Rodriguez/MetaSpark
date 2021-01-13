@@ -172,9 +172,9 @@ class MetaDeploy(object):
         Executor.run_all(executors)
         state = Executor.wait_all(executors, stop_on_error=False)
         if state:
-            prints('Export success!')
+            prints('Command "{}" success!'.format(command))
         else:
-            printe('Export failure!')
+            printw('Command "{}" failure on some nodes!'.format(command))
         return state
 
 

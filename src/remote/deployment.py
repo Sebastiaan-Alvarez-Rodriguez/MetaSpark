@@ -1,6 +1,6 @@
+import socket
 import subprocess
 import remote.util.ip as ip
-
 class Deployment(object):
     '''Object to contain, save and load node allocations'''
 
@@ -62,7 +62,7 @@ class Deployment(object):
     def load(file):
         deployment = Deployment()
         deployment.master_port = int(file.readline().strip())
-        deployment.infiniband = file.readline.strip()=='True'
+        deployment.infiniband = file.readline().strip()=='True'
         deployment.raw_nodes = [x.strip() for x in file.readlines()]
         deployment._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in deployment.raw_nodes] if deployment.infiniband else deployment.raw_nodes
         return deployment
