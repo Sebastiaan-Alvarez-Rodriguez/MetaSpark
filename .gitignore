@@ -6,7 +6,9 @@ __pycache__/
 /experiments/*
 !/experiments/examples
 !/experiments/interface.py
-/recordings/
+!/experiments/util.py
+/recordings/*
+!/recordings/profiles
 /jars/
 /reservation
 /results/

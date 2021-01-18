@@ -92,9 +92,6 @@ def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_op
         for host in reserver.deployment.nodes:
             flame_command = 'ssh {} "python3 {}/main.py deploy flamegraph -t {} -o {}"'.format(host, fs.abspath(), flame_graph_duration, base_recordpath)
             executors.append(Executor(flame_command, shell=True))
-        Executor.run_all(executors) # Connect to all nodes, start listening for correct pids
-        print('Flamegraph reading set for {}. listening started...'.format(flame_graph_duration))
-        time.sleep(2) # Give executors some time to connect and start listening
     print('Executing command: {}'.format(command))
     status = os.system(command) == 0
     if status:
@@ -103,6 +100,8 @@ def _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_op
         printe('There were errors during deployment.')
 
     if flame_graph:
+        Executor.run_all(executors) # Connect to all nodes, start listening for correct pids
+        print('Flamegraph reading set for {}. listening started...'.format(flame_graph_duration))
         Executor.wait_all(executors, stop_on_error=False)
     return status
 
@@ -235,6 +234,19 @@ def _deploy_data(datalist, deploy_mode, skip):
     return os.system(command) == 0
 
 
+def _deploy_data_multiplier(multiplier, directory):
+    if directory[-1] == fs.sep():
+        directory = directory[:-1]
+    extension = fs.basename(directory)
+    num_files = int(fs.basename(fs.dirname(directory)))
+    for x in range(num_files):
+        source = fs.join(directory, '{}.{}'.format(x, extension))
+        for y in range(multiplier-1):
+            dest = fs.join(directory, '{}_{}.{}'.format(x, y, extension))
+            fs.ln(source, dest, is_dir=False)
+    return True
+
+
 def _deploy_meta_internal(experiment):
     if experiment == None:
         try:
@@ -290,7 +302,11 @@ def subparser(subparsers):
     deploymetaparser.add_argument('-e', '--experiment', type=str, metavar='experiment', help='Experiment to pick')
     deploymetaparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
 
-    return deployparser, deployapplparser, deploydataparser, deployflameparser, deploymetaparser
+    deploymultiplierparser = subsubparsers.add_parser('multiplier', help=argparse.SUPPRESS)
+    deploymultiplierparser.add_argument('-n', '--number', type=int, metavar='amount', default='10', help='Amount of items to end with after symlinking (1 original item + x symlinks) = this number')
+    deploymultiplierparser.add_argument('-d', '--dir', type=str, metavar='path', help='Dir to perform file multiplication')
+
+    return deployparser, deployapplparser, deploydataparser, deployflameparser, deploymetaparser, deploymultiplierparser
 
 
 # Return True if we found arguments used from this subparser, False otherwise
@@ -301,7 +317,7 @@ def deploy_args_set(args):
 
 # Processing of deploy commandline args occurs here
 def deploy(parsers, args):
-    deployparser, deployapplparser, deploydataparser, deployflameparser, deploymetaparser = parsers
+    deployparser, deployapplparser, deploydataparser, deployflameparser, deploymetaparser, deploymultiplierparser = parsers
     if args.subcommand == 'application':
         jarfile = args.jarfile
         mainclass = args.mainclass
@@ -324,5 +340,8 @@ def deploy(parsers, args):
             _deploy_meta_internal(args.experiment)
         else:
             _deploy_meta(args.experiment)
+    elif args.subcommand == 'multiplier':
+        _deploy_data_multiplier(args.number, args.dir)
     else:
         deployparser.print_help()
+    return True

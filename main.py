@@ -135,15 +135,12 @@ def settings():
     return metacfg.change_settings()
 
 
-# Handles execution on the remote main node, before booting the cluster
-def start(time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact):
-    print('Connected! Using cluster configuration "{}"'.format(config_filename))
+# Starts cluster, without starting Spark.
+# Returns reservation
+def _start_cluster(time_to_reserve, config_filename, deploy_mode, no_interact):
     cluster_cfg = clr.get_or_create_cluster_config(config_filename)
     if not cluster_cfg:
         return False
-
-    deploy_mode = DeployMode.interpret(deploy_mode)
-
 
     nodes = cluster_cfg.nodes + 1 # We always want 1 node for the spark master alone
     if cluster_cfg.coallocation_affinity > 1:
@@ -173,10 +170,18 @@ Spawning {} nodes instead to service your request!
     
     # Remove old logs
     fs.rm(loc.get_spark_logs_dir(), ignore_errors=True)
+    return reserver
 
-    print('Booting network...')
+
+# Handles execution on the remote main node, before booting the cluster
+def start(time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact):
+    print('Connected! Using cluster configuration "{}"'.format(config_filename))
+    deploy_mode = DeployMode.interpret(deploy_mode)
+    reserver = _start_cluster(time_to_reserve, config_filename, deploy_mode, no_interact)
     
-    port = 7077
+    print('Booting network...')
+
+    port = 7077 # master port we will use
     # Boot master first
     status = rmt.boot_master(reserver.deployment.master_ip, port=port, debug_mode=debug_mode)
     if not status:

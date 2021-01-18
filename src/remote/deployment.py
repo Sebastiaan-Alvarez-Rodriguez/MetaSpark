@@ -13,15 +13,21 @@ class Deployment(object):
         self._nodes = None
         self._master_port = None
         if reservation_number != None:
-            self.raw_nodes = subprocess.check_output("preserve -llist | grep "+str(reservation_number)+" | awk -F'\\t' '{ print $NF }'", shell=True).decode('utf-8').strip().split()
-            self.raw_nodes.sort(key=lambda x: int(x[4:]))
-            self._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in self.raw_nodes] if infiniband else self.raw_nodes
+            self._raw_nodes = subprocess.check_output("preserve -llist | grep "+str(reservation_number)+" | awk -F'\\t' '{ print $NF }'", shell=True).decode('utf-8').strip().split()
+            self._raw_nodes.sort(key=lambda x: int(x[4:]))
+            self._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in self._raw_nodes] if infiniband else self._raw_nodes
         self.infiniband = infiniband
 
+    # Returns nodes, which have form 'node042', or, if infiniband flag is set, an infiniband ip address
     @property
     def nodes(self):
         return self._nodes
 
+    # Returns raw nodes, which always have form 'node042, node060'
+    @property
+    def raw_nodes(self):
+        return self._raw_nodes
+    
     @property
     def master_ip(self):
         return self._nodes[0]
@@ -44,17 +50,17 @@ class Deployment(object):
 
     # Returns whether this host is the master node
     def is_master(self):
-        return self.raw_nodes[0] == socket.gethostname()
+        return self._raw_nodes[0] == socket.gethostname()
 
     # Returns the global id of this host
     def get_gid(self):
-        return self.raw_nodes.index(socket.gethostname())
+        return self._raw_nodes.index(socket.gethostname())
 
     # Save deployment to disk
     def persist(self, file):
         file.write(str(self._master_port)+'\n')
         file.write(str(self.infiniband)+'\n')
-        for x in self.raw_nodes:
+        for x in self._raw_nodes:
             file.write(x+'\n')
 
     # Load deployment from disk
@@ -63,6 +69,6 @@ class Deployment(object):
         deployment = Deployment()
         deployment.master_port = int(file.readline().strip())
         deployment.infiniband = file.readline().strip()=='True'
-        deployment.raw_nodes = [x.strip() for x in file.readlines()]
-        deployment._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in deployment.raw_nodes] if deployment.infiniband else deployment.raw_nodes
+        deployment._raw_nodes = [x.strip() for x in file.readlines()]
+        deployment._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in deployment._raw_nodes] if deployment.infiniband else deployment._raw_nodes
         return deployment

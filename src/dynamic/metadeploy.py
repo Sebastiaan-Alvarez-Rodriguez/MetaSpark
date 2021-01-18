@@ -77,18 +77,31 @@ class MetaDeploy(object):
     If debug_mode is True, we print extra information. Do not use for production.
     deploy_mode determines where we place Spark worker work directories (e.g. on NFS mount, local disks, RAMdisk, local-ssd)
     If no_interact is True, we never ask stuff to the user, useful for running batch-jobs.
+    If launch_spark is True, we launch Spark on allocated nodes. Otherwise, we only allocate nodes
     We try to boot the cluster for retries retries. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def cluster_start(self, time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact, retries=5, retry_sleep_time=5):
+    def cluster_start(self, time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact, launch_spark=True, retries=5, retry_sleep_time=5):
         self._deploymode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
-        from main import start
         for x in range(retries):
-            if start(time_to_reserve, config_filename, debug_mode, str(self._deploymode), no_interact):
-                self._deployment = Reserver.load().deployment
+            if launch_spark:
+                from main import start
+                if start(time_to_reserve, config_filename, debug_mode, str(self._deploymode), no_interact):
+                    self._deployment = Reserver.load().deployment
+                    return True
+            else:
+                from main import _start_cluster
+                self._deployment = _start_cluster(time_to_reserve, config_filename, str(self._deploymode), no_interact).deployment
                 return True
+
             time.sleep(retry_sleep_time)
         return False
 
+
+    @property
+    def deployment(self):
+        if self._deployment:
+            return self._deployment
+        raise RuntimeError('Have no available deployment!')
 
     '''
     We stop a cluster using this function.
