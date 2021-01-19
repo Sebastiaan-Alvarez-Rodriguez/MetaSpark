@@ -46,12 +46,8 @@ class MetaDeploy(object):
         val = None
         state = MetaDeployState.INIT
         unchanged = 0
+
         while True:
-            if state == MetaDeployState.COMPLETE:
-                return True # Completed!
-            elif state == MetaDeployState.FAILED:
-                return False # User function tells we failed
-            
             if args == None or len(args) == 0:
                 tmp = command()
             else:
@@ -65,6 +61,11 @@ class MetaDeploy(object):
                 val = val_cur
             else:
                 state = tmp
+
+            if state == MetaDeployState.COMPLETE:
+                return True # Completed!
+            elif state == MetaDeployState.FAILED:
+                return False # User function tells we failed
 
             if unchanged == dead_after_retries:
                 printe('Value ({}) did not change in {} times {} seconds!'.format(val, dead_after_retries, sleeptime))

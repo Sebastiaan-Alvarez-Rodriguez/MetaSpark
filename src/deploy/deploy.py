@@ -243,7 +243,7 @@ def _deploy_data_multiplier(multiplier, directory):
         source = fs.join(directory, '{}.{}'.format(x, extension))
         for y in range(multiplier-1):
             dest = fs.join(directory, '{}_{}.{}'.format(x, y, extension))
-            fs.ln(source, dest, is_dir=False)
+            fs.ln(source, dest, soft=False, is_dir=False)
     return True
 
 

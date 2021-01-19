@@ -65,8 +65,11 @@ def join(directory, *args):
         returnstring = os.path.join(returnstring, str(arg))
     return returnstring
 
-def ln(pointedloc, pointerloc, is_dir=None):
-    os.symlink(pointedloc, pointerloc, target_is_directory=isdir(pointedloc) if is_dir == None else is_dir)
+def ln(pointedloc, pointerloc, soft=True, is_dir=None):
+    if soft: # Make softlink
+        os.symlink(pointedloc, pointerloc, target_is_directory=isdir(pointedloc) if is_dir == None else is_dir)
+    else: # Make hardlink
+        os.link(pointedloc, pointerloc)
 
 def ls(directory, only_files=False, only_dirs=False, full_paths=False, *args):
     ddir = join(directory, *args)
