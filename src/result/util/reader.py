@@ -1,5 +1,6 @@
 # This file contains a fast log reader for increasing log numbers
 import numpy as np
+import itertools
 
 import util.fs as fs
 from util.printer import *
@@ -51,6 +52,7 @@ class Reader(object):
                                 if not _match(frb, rb):
                                     continue
                                 self.files.append(outfile)
+        self.files.sort()
         print('Matched {} files'.format(len(self.files)))
 
     # Lazily read and return data using a filter
@@ -58,10 +60,19 @@ class Reader(object):
     # Data is provided as it0, ct0, a0, it1, ct1, a1
     def read_ops(self, node=None, partitions_per_node=None, extension=None, amount=None, kind=None, rb=None, skip_initial=True):
         self._filter_files(node, partitions_per_node, extension, amount, kind, rb)
-        for file in self.files:
-            with open(file, 'r') as f:
-                identifiers = fs.dirname(file).split(fs.sep())[-5:] + [filename_to_rb(file)]
-                yield Frame(*identifiers, f.readlines(), skip_initial)
+
+        if len(self.files) > 0:
+            if self.files[0].endswith('_a'): # We deal with the 'new' system, with separate arrow and spark result files
+                for file_a, file_b in zip(self.files[0::2], self.files[1::2]):
+                    with open(file_a, 'r') as f_a:
+                        with open(file_b, 'r') as f_b:
+                            identifiers = fs.dirname(file_a).split(fs.sep())[-7:] + [filename_to_rb(file_a)]
+                            yield Frame(*identifiers, itertools.chain.from_iterable(zip(f_a.readlines(), f_b.readlines())), skip_initial)
+            else: # We deal with the old system, with 1 file containing alternating arrow and spark results
+                for file in self.files:
+                    with open(file, 'r') as f:
+                        identifiers = fs.dirname(file).split(fs.sep())[-5:] + [filename_to_rb(file)]
+                        yield Frame(*identifiers, f.readlines(), skip_initial)
 
     @property
     def num_files(self):
