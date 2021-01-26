@@ -76,6 +76,9 @@ class Reader(object):
                         frame_a = Frame(*identifiers_a, 'arrow', f_a.readlines(), skip_initial)
                     with open(file_b, 'r') as f_b:
                         frame_b = Frame(*identifiers_a, 'spark', f_b.readlines(), skip_initial)
+                    if frame_a.empty and frame_b.empty:
+                        printw('Skipping an empty pair of frames')
+                        continue
                     yield (frame_a, frame_b)
 
             else: # We deal with the old system, with 1 file containing alternating arrow and spark results
@@ -83,9 +86,12 @@ class Reader(object):
                     with open(file, 'r') as f:
                         identifiers = fs.dirname(file).split(fs.sep())[-5:] + [filename_to_rb(file)]
                         lines = f.readlines()
-                        lines_a = lines[::2]
-                        lines_b = lines[1::2] 
-                        yield (Frame(*identifiers, 'arrow', lines_a, skip_initial), Frame(*identifiers, 'spark', lines_b, skip_initial))
+                        frame_a = Frame(*identifiers, 'arrow', lines[::2], skip_initial)
+                        frame_b = Frame(*identifiers, 'spark', lines[1::2], skip_initial)  
+                        if frame_a.empty and frame_b.empty:
+                            printw('Skipping an empty pair of frames')
+                            continue
+                        yield (frame_a, frame_b)
 
     @property
     def num_files(self):
@@ -119,12 +125,16 @@ class Frame(object):
 
 
     def __len__(self):
-        return self.size_
+        return self.size
 
     @property
     def size(self):
         return len(self.i_arr)
 
+    @property
+    def empty(self):
+        return self.size == 0
+    
 
     @property
     def i_time(self):
