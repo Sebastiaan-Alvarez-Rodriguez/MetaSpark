@@ -29,27 +29,29 @@ class Reader(object):
         self.files = []
         for dnode in sorted(fs.ls(self.path, only_dirs=True), key=lambda x: int(x)):
             if not _match(dnode, node):
-                # printw('Node={} did not match filter={}'.format(dnode, node))
+                printw('Node={} did not match filter={}'.format(dnode, node))
                 continue
             for dpartitions_per_node in sorted(fs.ls(fs.join(self.path, dnode), only_dirs=True), key=lambda x: int(x)):
                 if not _match(dpartitions_per_node, partitions_per_node):
-                    # printw('PartitionsPerNode={} did not match filter={}'.format(dpartitions_per_node, partitions_per_node))
+                    printw('PartitionsPerNode={} did not match filter={}'.format(dpartitions_per_node, partitions_per_node))
                     continue
                 for dextension in fs.ls(fs.join(self.path, dnode, dpartitions_per_node), only_dirs=True):
                     if not _match(dextension, extension):
-                        # printw('Extension={} did not match filter={}'.format(dextension, extension))
+                        printw('Extension={} did not match filter={}'.format(dextension, extension))
                         continue
                     for damount in sorted(fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension), only_dirs=True), key=lambda x: int(x)):
                         if not _match(damount, amount):
-                            # printw('Amount={} did not match filter={}'.format(damount, amount))
+                            printw('Amount={} did not match filter={}'.format(damount, amount))
                             continue
                         for dkind in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension, damount), only_dirs=True):
                             if not _match(dkind, kind):
-                                # printw('Kind={} did not match filter={}'.format(dkind, kind))
+                                printw('Kind={} did not match filter={}'.format(dkind, kind))
                                 continue
-                            for outfile in sorted([x for x in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension, damount, dkind), only_files=True, full_paths=True) if x.endswith('.res')], key=lambda x: filename_to_rb(x)):
+                            tmp_matched = sorted([x for x in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension, damount, dkind), only_files=True, full_paths=True) if x.endswith('.res') or x.endswith('.res_a') or x.endswith('.res_s')], key=lambda x: filename_to_rb(x))
+                            for outfile in tmp_matched:
                                 frb = filename_to_rb(outfile)
                                 if not _match(frb, rb):
+                                    printw('Buffersize={} did not match filter={}'.format(frb, rb))
                                     continue
                                 self.files.append(outfile)
         self.files.sort()
@@ -63,16 +65,27 @@ class Reader(object):
 
         if len(self.files) > 0:
             if self.files[0].endswith('_a'): # We deal with the 'new' system, with separate arrow and spark result files
+                print('New system detected')
                 for file_a, file_b in zip(self.files[0::2], self.files[1::2]):
+
+                    identifiers_a = fs.dirname(file_a).split(fs.sep())[-5:] + [filename_to_rb(file_a)]
+                    identifiers_b = fs.dirname(file_b).split(fs.sep())[-5:] + [filename_to_rb(file_b)]
+                    if identifiers_a != identifiers_b:
+                        raise RuntimeError('Error: Found that identifiers are not equivalent of files in same directory')
                     with open(file_a, 'r') as f_a:
-                        with open(file_b, 'r') as f_b:
-                            identifiers = fs.dirname(file_a).split(fs.sep())[-7:] + [filename_to_rb(file_a)]
-                            yield Frame(*identifiers, itertools.chain.from_iterable(zip(f_a.readlines(), f_b.readlines())), skip_initial)
+                        frame_a = Frame(*identifiers_a, 'arrow', f_a.readlines(), skip_initial)
+                    with open(file_b, 'r') as f_b:
+                        frame_b = Frame(*identifiers_a, 'spark', f_b.readlines(), skip_initial)
+                    yield (frame_a, frame_b)
+
             else: # We deal with the old system, with 1 file containing alternating arrow and spark results
                 for file in self.files:
                     with open(file, 'r') as f:
                         identifiers = fs.dirname(file).split(fs.sep())[-5:] + [filename_to_rb(file)]
-                        yield Frame(*identifiers, f.readlines(), skip_initial)
+                        lines = f.readlines()
+                        lines_a = lines[::2]
+                        lines_b = lines[1::2] 
+                        yield (Frame(*identifiers, 'arrow', lines_a, skip_initial), Frame(*identifiers, 'spark', lines_b, skip_initial))
 
     @property
     def num_files(self):
@@ -85,14 +98,11 @@ class Frame(object):
     # Initialize a new frame.
     # If skip_initial is set, we skip the first 2 entries of lines.
     # This is useful, because the first 2 entries are without any cached values 
-    def __init__(self, node, partitions_per_node, extension, amount, kind, rb, lines, skip_initial=True):
-        if len(lines) % 2 != 0:
-            lines = lines[:-1]
+    def __init__(self, node, partitions_per_node, extension, amount, kind, rb, tag, lines, skip_initial=True):
         if skip_initial:
-            lines = lines[2:]
-        ptimes = [int(x.split(',', 1)[0]) for x in lines[::2]]
-        itimes = [int(x.split(',', 2)[1-(idx % 2)]) for idx, x in enumerate(lines)]
-        ctimes = [int(x.split(',', 2)[2-(idx % 2)]) for idx, x in enumerate(lines)]
+            lines = lines[1:]
+        itimes = [int(x.split(',', 1)[0]) for idx, x in enumerate(lines)]
+        ctimes = [int(x.split(',', 1)[1]) for idx, x in enumerate(lines)]
 
         # Identifiers
         self.node = int(node)
@@ -101,88 +111,41 @@ class Frame(object):
         self.amount = int(amount)
         self.kind = kind
         self.rb = int(rb)
+        self.tag = tag
 
-        self.ds_p_arr = np.array(ptimes[::2])
+        self.i_arr = np.array(itimes)
+        self.c_arr = np.array(ctimes)
 
-        self.ds_i_arr = np.array(itimes[::2])
-        self.spark_i_arr = np.array(itimes[1::2])
-
-        self.ds_c_arr = np.array(ctimes[::2])
-        self.spark_c_arr = np.array(ctimes[1::2])
 
 
     def __len__(self):
-        return self.size
+        return self.size_
 
     @property
     def size(self):
-        return self.ds_size + self.spark_size
+        return len(self.i_arr)
+
 
     @property
-    def ds_size(self):
-        return len(self.ds_i_arr)
-
-    @property
-    def spark_size(self):
-        return len(self.spark_i_arr)
-
-        
-    # Dataset total times spent in locations
-    @property
-    def ds_p_time(self):
-        return float(np.sum(self.ds_p_arr)) / 1000000000
-
-    @property
-    def ds_i_time(self):
-        return float(np.sum(self.ds_i_arr)) / 1000000000
+    def i_time(self):
+        return float(np.sum(self.i_arr)) / 1000000000
     
     @property
-    def ds_c_time(self):
-        return float(np.sum(self.ds_c_arr)) / 1000000000
+    def c_time(self):
+        return float(np.sum(self.c_arr)) / 1000000000
     
     @property
-    def ds_total_time(self):
-        return self.ds_i_time+self.ds_c_time
-    
-    # Spark total times spent in locations
-    @property
-    def spark_i_time(self):
-        return float(np.sum(self.spark_i_arr)) / 1000000000
+    def total_time(self):
+        return self.i_time+self.c_time
     
     @property
-    def spark_c_time(self):
-        return float(np.sum(self.spark_c_arr)) / 1000000000
-    
-    @property
-    def spark_total_time(self):
-        return self.spark_i_time+self.spark_c_time
-    
-    # Dataset average times spent in locations
-    @property
-    def ds_p_avgtime(self):
-        return np.average(self.ds_p_arr) / 1000000000
-     
-    @property
-    def ds_i_avgtime(self):
-        return np.average(self.ds_i_arr) / 1000000000
+    def i_avgtime(self):
+        return np.average(self.i_arr) / 1000000000
         
     @property
-    def ds_c_avgtime(self):
-        return np.average(self.ds_c_arr) / 1000000000
+    def c_avgtime(self):
+        return np.average(self.c_arr) / 1000000000
     
     @property
-    def ds_total_avgtime(self):
-        return self.ds_i_avgtime+self.ds_c_avgtime
-    
-    # Spark average times spent in locations
-    @property
-    def spark_i_avgtime(self):
-        return np.average(self.spark_i_arr) / 1000000000
-        
-    @property
-    def spark_c_avgtime(self):
-        return np.average(self.spark_c_arr) / 1000000000
-    
-    @property
-    def spark_total_avgtime(self):
-        return self.spark_i_avgtime+self.spark_c_avgtime
+    def total_avgtime(self):
+        return self.i_avgtime+self.c_avgtime

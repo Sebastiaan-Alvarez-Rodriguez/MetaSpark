@@ -3,6 +3,7 @@ import numpy as np
 import scipy.stats as sc
 
 from result.util.reader import Reader
+from result.util.dimension import Dimension
 import result.util.storer as storer
 import util.fs as fs
 import util.location as loc
@@ -13,7 +14,7 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
 
     # print('When looking at the 32, pq, 10000, 20480*8 category:')
     reader = Reader(path)
-    for frame in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
+    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
         if large:
             fontsize = 24
             font = {
@@ -25,17 +26,17 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
 
         fig, ax = plt.subplots(2)
         # Multiple plots: https://matplotlib.org/devdocs/gallery/subplots_axes_and_figures/subplots_demo.html
-        ds_arr = np.add(frame.ds_c_arr, frame.ds_i_arr) / 1000000000
-        spark_arr = np.add(frame.spark_c_arr, frame.spark_i_arr) / 1000000000
+        ds_arr = np.add(frame_arrow.c_arr, frame_arrow.i_arr) / 1000000000
+        spark_arr = np.add(frame_spark.c_arr, frame_spark.i_arr) / 1000000000
         ds_arr.sort()
         spark_arr.sort()
 
         ds_pdf = sc.norm.pdf(ds_arr, np.average(ds_arr), np.std(ds_arr))
         spark_pdf = sc.norm.pdf(spark_arr, np.average(spark_arr), np.std(spark_arr))
-        ax[0].plot(ds_arr, ds_pdf, label='Dataset')
+        ax[0].plot(ds_arr, ds_pdf, label='Arrow-Spark')
         ax[1].plot(spark_arr, spark_pdf, label='Spark')
 
-        ax[0].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Dataset')
+        ax[0].set(xlabel='Time (s) for '+Dimension.make_id_string(frame_arrow, node, partitions_per_node, extension, amount, kind, rb), ylabel='Probability density', title='Total execution time for Arrow-Spark')
         ax[1].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Spark')
         
         if large:

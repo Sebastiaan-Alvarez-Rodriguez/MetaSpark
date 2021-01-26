@@ -16,17 +16,17 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
     plot_arr = []
     label_arr = []
     title_arr = []
-    for frame in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
-        # ds_arr = np.add(frame.ds_c_arr, frame.ds_i_arr)
-        # spark_arr = np.add(frame.spark_c_arr, frame.spark_i_arr)
-        ds_arr = frame.ds_c_arr
-        spark_arr = frame.spark_c_arr
-        plot_arr.append((ds_arr / 1000000000, spark_arr / 1000000000.))
+    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
+        # ds_arr = np.add(frame_arrow.c_arr, frame_arrow.i_arr)
+        # spark_arr = np.add(frame_spark.c_arr, frame_spark.i_arr)
+        arrow_arr = frame_arrow.c_arr
+        spark_arr = frame_spark.c_arr
+        plot_arr.append((arrow_arr / 1000000000, spark_arr / 1000000000))
 
         ovars = Dimension.open_vars(node, partitions_per_node, extension, amount, kind, rb)[0]
-        label_arr.append(('Arrow-Spark: {}'.format(Dimension.make_id_string(frame, node, partitions_per_node, extension, amount, kind, rb)),'Spark: {}'.format(Dimension.make_id_string(frame, node, partitions_per_node, extension, amount, kind, rb)),))
+        label_arr.append(('Arrow-Spark: {}'.format(Dimension.make_id_string(frame_arrow, node, partitions_per_node, extension, amount, kind, rb)),'Spark: {}'.format(Dimension.make_id_string(frame_spark, node, partitions_per_node, extension, amount, kind, rb)),))
         
-        title_arr.append('Computation time for {} nodes'.format(frame.node))
+        title_arr.append('Computation time for {} nodes'.format(frame_arrow.node))
 
     if large:
         fontsize = 24

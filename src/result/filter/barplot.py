@@ -40,15 +40,15 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
     c_arr1 = []
     xticks1 = []
     hits = 0
-    for frame in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
+    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
         # BAR1loc
-        i_arr0.append(np.average(frame.ds_i_avgtime))
-        c_arr0.append(np.average(frame.ds_c_avgtime))
-        xticks0.append(getattr(frame, ovar))
+        i_arr0.append(np.average(frame_arrow.i_avgtime))
+        c_arr0.append(np.average(frame_arrow.c_avgtime))
+        xticks0.append(getattr(frame_arrow, ovar))
         # BAR2loc
-        i_arr1.append(np.average(frame.spark_i_avgtime))
-        c_arr1.append(np.average(frame.spark_c_avgtime))
-        xticks1.append(getattr(frame, ovar))
+        i_arr1.append(np.average(frame_spark.i_avgtime))
+        c_arr1.append(np.average(frame_spark.c_avgtime))
+        xticks1.append(getattr(frame_spark, ovar))
         hits +=1
 
     if hits == 0:
