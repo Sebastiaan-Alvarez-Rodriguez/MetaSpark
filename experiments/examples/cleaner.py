@@ -12,7 +12,7 @@ from util.printer import *
 
 
 def get_experiment():
-    '''Pass your defined experiment class in this function so MetaZoo can find it'''
+    '''Pass your defined experiment class in this function so MetaSpark can find it'''
     return Cleaner
 
 

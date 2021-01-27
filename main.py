@@ -57,7 +57,8 @@ def export(full_exp=False):
             'data',
             'results',
             'graphs',
-            'jars'])
+            'jars',
+            'recordings'])
         if not clean():
             printe('Cleaning failed')
             return False
@@ -70,7 +71,8 @@ def export(full_exp=False):
             'results', 
             'graphs',
             'deps',
-            'jars'])
+            'jars',
+            'recordings'])
     if os.system(command) == 0:
         prints('Export success!')
         return True

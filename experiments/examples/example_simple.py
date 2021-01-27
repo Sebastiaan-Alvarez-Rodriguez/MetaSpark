@@ -1,35 +1,41 @@
 import random
 import time
 
-from experiments.interface import ExperimentInterface
-from dynamic.metadeploy import MetaDeployState
 
+from dynamic.metadeploy import MetaDeployState
+from experiments.interface import ExperimentInterface
+from remote.util.deploymode import DeployMode
+
+import util.fs as fs
 # We suggest all experiments which print anything to the console
 # to use below import statement. This forces in-order printing. 
-import util.fs as fs
 from util.printer import *
 
 
 def get_experiment():
-    '''Pass your defined experiment class in this function so MetaZoo can find it'''
+    '''Pass your defined experiment class in this function so MetaSpark can find it'''
     return ExampleExperiment
 
 class ExampleExperiment(ExperimentInterface):
-    '''
-    A most useful experiment.
-    '''
+    '''A most useful experiment.'''
+
+    def init_params(self):
+        # Cluster deployment params
+        self.config_filename = 'test.cfg' # Use cluster setup as described in <project root>/conf/cluster/test.cfg
+        self.debug_mode = False # less printing
+        self.cluster_deploy_mode = DeployMode.LOCAL # Places Spark cluster workdirs on /local/username/ of each node
+        self.no_interact = True # We want to run batch jobs, so no user interaction
+        
+        # Application deployment params
+        self.time_to_reserve = '15:00' # Just reserve the nodes for 15 minutes
+        self.no_results_dir = True # We will not store any results, so we do not need a results dir for each run
+        
+        # Data deployment params
+        self.skip_if_exists = True # Skip copying files if they already exist on the node
+
 
     def start(self, metadeploy):
-        # Cluster deployment params
-        config_filename = 'test.cfg' # Use cluster setup as described in <project root>/conf/cluster/test.cfg
-        debug_mode = False # less printing
-        fast = True # Use a fast cluster deployment strategy
-        no_interact = True # We want to run batch jobs, so no user interaction
-        # Application deployment params
-        time_to_reserve = '15:00' # Just reserve the nodes for 15 minutes
-        no_results_dir = True # We will not store any results, so we do not need a results dir for each run
-        # Data deployment params
-        skip_if_exists = True # Skip copying files if they already exist on the node
+        self.init_params()
 
         state_ok = True # Used to return whether we had any errors in our runs
         for x in range(10):
@@ -48,7 +54,7 @@ class ExampleExperiment(ExperimentInterface):
             submit_opts = None
             
             print('Starting up a cluster...')
-            state_ok &= metadeploy.cluster_start(time_to_reserve, config_filename, debug_mode, fast, no_interact)
+            state_ok &= metadeploy.cluster_start(self.time_to_reserve, self.config_filename, self.debug_mode, self.fast, self.no_interact)
             print('Cleaning junk data...')
             state_ok &= metadeploy.clean_junk()
             print('Deploying data to allocated nodes...')
@@ -60,9 +66,9 @@ class ExampleExperiment(ExperimentInterface):
             #       The reason for that is simple: We may have been given new nodes, that do not contain the data yet.
             # 
             # An example call is given below
-            # metadeploy.deploy_data(['MYFILE.txt', 'ADIRPATH/DIR/'], skip_if_exists)
+            # metadeploy.deploy_data(['MYFILE.txt', 'ADIRPATH/DIR/'], self.skip_if_exists)
             print('Deploying application...')
-            state_ok &= metadeploy.deploy_application(jarfile, mainclass, args, extra_jars, submit_opts, no_results_dir)
+            state_ok &= metadeploy.deploy_application(jarfile, mainclass, args, extra_jars, submit_opts, self.no_results_dir)
             
             print('Blocking until we are done...')
             # We block until the am_i_done_yet function returns MetaDeployState.COMPLETE
@@ -74,10 +80,9 @@ class ExampleExperiment(ExperimentInterface):
                 print('Terrible news: We failed execution of iteration {}!'.format(x))
                 state_ok = False
             state_ok &= metadeploy.cluster_stop()
-            # We stop and reboot the cluster in the loop
-            # If we don't do that, and execution takes > 15:00,
-            # then we find out we cannot deploy applications/data
-            # on dead reservations in following iterations.
+            # We stop and reboot the cluster in the loop.
+            # If we don't do that, and execution takes > 15:00, then our cluster will be closed by the reservation system. 
+            # We cannot  deploy applications/data on dead reservations in following iterations.
         return state_ok
 
     def am_i_done_yet(self, some_param):

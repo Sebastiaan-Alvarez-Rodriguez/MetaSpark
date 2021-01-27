@@ -50,3 +50,17 @@ python3 main.py deploy spark-examples_2.12-3.0.1.jar \
 org.apache.spark.examples.SparkPi \
 --args "10"
 ```
+
+
+## Improved Usage
+Sometimes, we want to run experiments on the DAS5. We need greater control over the process.
+For that, we have the `deploy meta` extension. In this extension, you can run Python3 code on the DAS5 main node to:
+ - spawn clusters,
+ - deploy data
+ - wait until execution completes
+ - clean up after experiment completes
+
+Also, you can write Python3 code to perform your own tasks as well.
+Finally, it is possible to perform multiple experiments one after the other, in one command.
+
+For more information about the improved usage, check [experiments/README.md](/experiments/README.md).
