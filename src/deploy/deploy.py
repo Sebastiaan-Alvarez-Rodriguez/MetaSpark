@@ -247,17 +247,19 @@ def _deploy_data_multiplier(multiplier, directory):
     return True
 
 
-def _deploy_meta_internal(experiment):
-    if experiment == None:
-        try:
-            experiments = exp.get_experiments()
-        except RuntimeError as e:
+def _deploy_meta_internal(experiment_names):
+    if experiment_names == None or len(experiment_names) == 0:
+        experiments = exp.get_experiments()
+        if len(experiments) == 0:
             printe('Could not find an experiment to run. Please make an experiment in {}. See the README.md for more info.'.format(loc.get_metaspark_experiments_dir()))
             return False
     else:
-        experiments = exp.load_experiment(experiment)
+        experiments = []
+        for name in experiment_names:
+            experiments.append(exp.load_experiment(name))
+
     for idx, x in enumerate(experiments):
-        print('Starting experiment {}'.format(idx))
+        print('Starting experiment {}/{}'.format(idx, len(experiments)-1))
         if x.start():
             print('Experiment {} completed successfully'.format(idx))
         else:
@@ -266,8 +268,9 @@ def _deploy_meta_internal(experiment):
         print('Experiment {} stopped'.format(idx))
     return True
 
-def _deploy_meta(experiment):
-    program = '--internal {}'.format(('-e '+experiment) if experiment != None else '')
+# Deploy experiments, which can do all sorts of things which users would normally have to do manually
+def _deploy_meta(experiments):
+    program = '--internal {}'.format(('-e '+ ' '.join(experiments)) if len(experiments) > 0 else '')
     command = 'ssh {} "python3 {}/main.py deploy meta {}"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir(), program)
     print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
     return os.system(command) == 0
@@ -299,7 +302,7 @@ def subparser(subparsers):
     deployflameparser.add_argument('-o', '--outputdir', type=str, metavar='path', help='Record output location. Files will be stored in given absolute directorypath visible after measuring is complete')
 
     deploymetaparser = subsubparsers.add_parser('meta', help='Deploy applications with all variations of given parameters')
-    deploymetaparser.add_argument('-e', '--experiment', type=str, metavar='experiment', help='Experiment to pick')
+    deploymetaparser.add_argument('-e', '--experiment', nargs='+', metavar='experiments', help='Experiments to pick')
     deploymetaparser.add_argument('--internal', help=argparse.SUPPRESS, action='store_true')
 
     deploymultiplierparser = subsubparsers.add_parser('multiplier', help=argparse.SUPPRESS)

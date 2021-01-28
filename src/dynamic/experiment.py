@@ -33,7 +33,7 @@ class Experiment(object):
 
 
 # Load experiment. Assumes 'picked' is a string for 1 experiment, relative to <project root>/experiments/
-# Returns None on failure, a singleton list containing the Experiment on success
+# Returns None on failure, an Experiment on success
 def load_experiment(picked):
     item = picked if picked.endswith('.py') else '{}.py'.format(picked)
 
@@ -44,7 +44,7 @@ def load_experiment(picked):
     item = fs.join(loc.get_metaspark_experiments_dir(), item)
     try:
         module = imp.import_full_path(item)
-        return [Experiment(item, module.get_experiment())]
+        return Experiment(item, module.get_experiment())
     except AttributeError:
         printe('Picked experiment at {} had no get_experiment()!'.format(item))
         return None
@@ -59,7 +59,10 @@ def get_experiments():
             module = imp.import_full_path(item)
             candidates.append((item, module.get_experiment(),))
         except AttributeError:
-            printw('Item had no get_experiment(): {}. Skipping for now...'.format(item))
+            printw('Experiment candidate had no get_experiment(): {}. Skipping for now...'.format(item))
+        except SyntaxError as e:
+            printw('Experiment candidate "{}" had a syntax error:'.format(item))
+            print(e)
 
     if len(candidates) == 0:
         raise RuntimeError('Could not find a subclass of "ExperimentInterface" in directory {}. Make a ".py" file there, with a class extending "ExperimentInterface". See the example implementation for more details.'.format(loc.get_metaspark_experiments_dir()))

@@ -130,6 +130,8 @@ Once you have your recordings, you can open these (`.jfr`) files using [this for
 
 > Note: You are advised to make the driver sleep for 4 to 6 seconds right after creating a `SparkSession` object, so the `jcmd` has time to find and attach to the Spark workers before they start executing.
 
+> Note: There are some pretty good explanations about using method profiling to construct flamegraphs. The openJDK program from above can make them for you. [Here](http://www.brendangregg.com/flamegraphs.html
+) is some good information on flamegraphs and their use.
 
 ## Waiting for a deployed application to finish
 Control is directly returned from `deploy_application` calls once the submission is complete.
