@@ -30,7 +30,7 @@ def blockfunc(metadeploy, outputloc, lines_needed):
 # If the data is not in /local, we deploy data from NFS mount to /local first and then proceed.
 # This is indeed a seemingly unnecessary step. However, next time we run this function,
 # we can deploy data straight from /local, which should be lots faster than copying from NFS mount again.
-def deploy_data_fast(metadeploy, generate_cmd, node, extension, amount, kind, rb, partitions_per_node, amounts_multiplier=1):
+def deploy_data_fast(metadeploy, generate_cmd, node, extension, compression, amount, kind, rb, partitions_per_node, amounts_multiplier=1):
     clean_cmd = 'rm -rf "{}" > /dev/null 2>&1'.format(loc.get_node_raw_ram_dir())
     if not metadeploy.deploy_nonspark_application(clean_cmd):
         # There were some files that we could not remove, possibly permission issues. Just go on
@@ -47,15 +47,17 @@ def deploy_data_fast(metadeploy, generate_cmd, node, extension, amount, kind, rb
         printe('!! Fatal error when trying to mkdir on RAM (command used: "{}")'.format(mkdir_cmd))
         return False
 
+    configured_extension = '{}_{}'.format(extension, compression) if kind == 'df' and compression != 'uncompressed' else extension
+
     # copy data to RAM directory
-    frompath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), amount, node*partitions_per_node, extension)
+    frompath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), amount, node*partitions_per_node, configured_extension)
     topath = fs.join(loc.get_node_data_dir(DeployMode.RAM), amount, node*partitions_per_node)
     cp_cmd = 'cp -r "{}" "{}"'.format(frompath, topath)
     if not metadeploy.deploy_nonspark_application(cp_cmd):
         printe('!! Fatal error when trying to cp data to RAM (command used: "{}")'.format(cp_cmd))
         return False
     if (amounts_multiplier > 1):
-        ln_cmd = 'python3 {}/main.py deploy multiplier -n {} -d "{}"'.format(fs.abspath(), amounts_multiplier, fs.join(topath, extension))
+        ln_cmd = 'python3 {}/main.py deploy multiplier -n {} -d "{}" -e {}'.format(fs.abspath(), amounts_multiplier, fs.join(topath, configured_extension), extension)
         if not metadeploy.deploy_nonspark_application(ln_cmd):
             printe('!! Fatal error when trying to create symlinks in RAM')
             return False

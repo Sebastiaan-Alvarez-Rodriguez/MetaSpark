@@ -234,10 +234,9 @@ def _deploy_data(datalist, deploy_mode, skip):
     return os.system(command) == 0
 
 
-def _deploy_data_multiplier(multiplier, directory):
+def _deploy_data_multiplier(multiplier, directory, extension):
     if directory[-1] == fs.sep():
         directory = directory[:-1]
-    extension = fs.basename(directory)
     num_files = int(fs.basename(fs.dirname(directory)))
     for x in range(num_files):
         source = fs.join(directory, '{}.{}'.format(x, extension))
@@ -308,6 +307,7 @@ def subparser(subparsers):
     deploymultiplierparser = subsubparsers.add_parser('multiplier', help=argparse.SUPPRESS)
     deploymultiplierparser.add_argument('-n', '--number', type=int, metavar='amount', default='10', help='Amount of items to end with after symlinking (1 original item + x symlinks) = this number')
     deploymultiplierparser.add_argument('-d', '--dir', type=str, metavar='path', help='Dir to perform file multiplication')
+    deploymultiplierparser.add_argument('-e', '--extension', type=str, metavar='extension', help='Extension of files in dir')
 
     return deployparser, deployapplparser, deploydataparser, deployflameparser, deploymetaparser, deploymultiplierparser
 
@@ -344,7 +344,7 @@ def deploy(parsers, args):
         else:
             _deploy_meta(args.experiment)
     elif args.subcommand == 'multiplier':
-        _deploy_data_multiplier(args.number, args.dir)
+        _deploy_data_multiplier(args.number, args.dir, args.extension)
     else:
         deployparser.print_help()
     return True

@@ -67,7 +67,7 @@ def _filterparser(subsubparsers):
     filterparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
     filterparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
     filterparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
-    filterparser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: barplot, generic, line, normal')
+    filterparser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: barplot, dot, generic, line, normal, variance')
 
 
 # Register 'deploy' subparser modules
@@ -123,6 +123,9 @@ def results(parser, args):
         if args.type == 'barplot':
             import result.filter.barplot as b
             b.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+        elif args.type == 'dot':
+            import result.filter.dot as d
+            d.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         elif args.type == 'generic':
             import result.filter.generic as g
             g.stats(args.data, *(fdata+[args.skip_initial]))
@@ -132,6 +135,9 @@ def results(parser, args):
         elif args.type == 'normal':
             import result.filter.normal as n
             n.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+        elif args.type == 'boxplot':
+            import result.filter.specific.boxplot as p
+            p.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         else:
             parser.print_help()
     elif args.subcommand == 'merge':

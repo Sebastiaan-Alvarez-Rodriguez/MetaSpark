@@ -2,35 +2,36 @@ class Dimension(object):
     @staticmethod
     def open_var(node, partitions_per_node, extension, amount, kind, rb):
         if node == None:
-            return 'node'
-        elif partitions_per_node == None:
-            return 'partitions_per_node'
-        elif extension == None:
-            return 'extension'
-        elif amount == None:
-            return 'amount'
-        elif kind == None:
-            return 'kind'
-        elif rb == None:
-            return 'rb'
+            return Dimension.OpenVariable('node')
+        if partitions_per_node == None:
+            return Dimension.OpenVariable('partitions_per_node')
+        if extension == None:
+            return Dimension.OpenVariable('extension')
+        if amount == None:
+            return Dimension.OpenVariable('amount')
+        if kind == None:
+            return Dimension.OpenVariable('kind')
+        if rb == None:
+            return Dimension.OpenVariable('rb')
         raise RuntimeError('No open vars found')
 
     @staticmethod
     def open_vars(node, partitions_per_node, extension, amount, kind, rb):
         ans = []
         if node == None:
-            ans.append('node')
+            ans.append(Dimension.OpenVariable('node'))
         if partitions_per_node == None:
-            ans.append('partitions_per_node')
+            ans.append(Dimension.OpenVariable('partitions_per_node'))
         if extension == None:
-            ans.append('extension')
+            ans.append(Dimension.OpenVariable('extension'))
         if amount == None:
-            ans.append('amount')
+            ans.append(Dimension.OpenVariable('amount'))
         if kind == None:
-            ans.append('kind')
+            ans.append(Dimension.OpenVariable('kind'))
         if rb == None:
-            ans.append('rb')
+            ans.append(Dimension.OpenVariable('rb'))
         return ans
+
 
     @staticmethod
     def num_open_vars(node, partitions_per_node, extension, amount, kind, rb):
@@ -39,4 +40,40 @@ class Dimension(object):
     @staticmethod
     def make_id_string(frame, node, partitions_per_node, extension, amount, kind, rb):
         ovars = Dimension.open_vars(node, partitions_per_node, extension, amount, kind, rb)
-        return ', '.join(['{}={}'.format(ovar, getattr(frame, ovar)) for ovar in ovars])
+        return ', '.join(['{}={}'.format(ovar, getattr(frame, str(ovar))) for ovar in ovars])
+
+    @staticmethod
+    def _open_var_numeric(name):
+        return name == 'node' or name == 'partitions_per_node' or name == 'amount' or name == 'rb'
+
+    @staticmethod
+    def _make_axis_description(name):
+        if name == 'node':
+            return 'Executor cluster size (nodes)'
+        if name == 'partitions_per_node':
+            return 'Partitions per node'
+        if name == 'extension':
+            return 'Used filetype'
+        if name == 'amount':
+            return 'data read (entries)'
+        if name == 'kind':
+            return 'Spark interaction type'
+        if name == 'rb':
+            return 'Readbuffer size (bytes)'
+
+    class OpenVariable(object):
+        def __init__(self, name, is_numeric=None, axis_description=None):
+            self.name = name
+            self.is_numeric = Dimension._open_var_numeric(name) if is_numeric == None else is_numeric
+            self.axis_description = Dimension._make_axis_description(name) if axis_description == None else axis_description
+
+        def val_to_ticks(self, val):
+            if self.is_numeric and val > 1000:
+                return '{:.2e}'.format(val)
+            return str(val)
+
+        def __str__(self):
+            return self.name
+
+        def __repr__(self):
+            return self.name
