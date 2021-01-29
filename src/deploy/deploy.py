@@ -258,7 +258,7 @@ def _deploy_meta_internal(experiment_names):
             experiments.append(exp.load_experiment(name))
 
     for idx, x in enumerate(experiments):
-        print('Starting experiment {}/{}'.format(idx, len(experiments)-1))
+        print('Starting experiment {}/{}'.format(idx+1, len(experiments)))
         if x.start():
             print('Experiment {} completed successfully'.format(idx))
         else:

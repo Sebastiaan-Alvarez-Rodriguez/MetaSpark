@@ -50,15 +50,12 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
 
     plot_items.sort(key=lambda item: int(item[0])) # Will sort on x0. x0==x1==ovar, the open variable
 
-    # bplot0 = ax[0].boxplot([x[1] for x in data0], positions=[x[0] for x in data0], patch_artist=True)
     bplot0 = ax.boxplot([x[1] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1-0.15)
-    plt.setp(bplot0['boxes'], color='lightgreen')
-    plt.setp(bplot0['boxes'], edgecolor='black')
-    plt.setp(bplot0['medians'], color='forestgreen')
-    
+    plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
+    plt.setp(bplot0['medians'], color='midnightblue')
+
     bplot1 = ax.boxplot([x[2] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1+0.15)
-    plt.setp(bplot1['boxes'], color='lightcoral')
-    plt.setp(bplot1['boxes'], edgecolor='black')
+    plt.setp(bplot1['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
     plt.setp(bplot1['medians'], color='indianred')
     plt.xticks(np.arange(len(plot_items))+1, labels=[ovar.val_to_ticks(x[0]) for x in plot_items])
 
