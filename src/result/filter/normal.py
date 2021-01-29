@@ -40,7 +40,7 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
         ax[1].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Spark')
         
         if large:
-            fig.set_size_inches(10, 8)
+            fig.set_size_inches(12, 9)
 
         fig.tight_layout()
 

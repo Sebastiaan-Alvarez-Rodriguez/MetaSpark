@@ -50,7 +50,7 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
         ax.legend(loc='right', frameon=False)
 
     if large:
-        fig.set_size_inches(10, 8)
+        fig.set_size_inches(12, 9)
 
         fig.tight_layout()
 

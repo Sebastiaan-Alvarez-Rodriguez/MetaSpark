@@ -57,35 +57,43 @@ def merge(data, skip_initial=True):
     prints('Merged {} files {}'.format(merges, '(all clean)' if merges == 0 else ''))
 
 
+def _add_filter_args(parser, type_opts):
+    parser.add_argument('-n', '--node', nargs='+', metavar='filter', help='Node filters')
+    parser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partitions-per-node filters')
+    parser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
+    parser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
+    parser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
+    parser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
+    parser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
+    parser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: '+', '.join(type_opts))
+
 def _filterparser(subsubparsers):
     filterparser = subsubparsers.add_parser('filter', help='Display generic info, based on filters')
+    _add_filter_args(filterparser, ['barplot', 'dot', 'generic', 'line', 'normal'])
+    return filterparser
 
-    filterparser.add_argument('-n', '--node', nargs='+', metavar='filter', help='Node filters')
-    filterparser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partitions-per-node filters')
-    filterparser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
-    filterparser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
-    filterparser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
-    filterparser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
-    filterparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
-    filterparser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: barplot, dot, generic, line, normal, variance')
 
+def _specificparser(subsubparsers):
+    specificparser = subsubparsers.add_parser('specific', help='Very specific plots, using filters')
+    _add_filter_args(specificparser, ['data_scalability'])
+    return specificparser
 
 # Register 'deploy' subparser modules
 def subparser(subparsers):
-    resultparser = subparsers.add_parser('results', help='Create result graphs/statistics')
-    subsubparsers = resultparser.add_subparsers(help='Subsubcommands', dest='subcommand')
-    _filterparser(subsubparsers)
+    resultparser   = subparsers.add_parser('results', help='Create result graphs/statistics')
+    subsubparsers  = resultparser.add_subparsers(help='Subsubcommands', dest='subcommand')
+    filterparser   = _filterparser(subsubparsers)
+    specificparser = _specificparser(subsubparsers)
 
     mergeparser = subsubparsers.add_parser('merge', help='Merge continuation files into main result files')
     mergeparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
 
-    
-    resultparser.add_argument('data', help='Location of data!', type=str)
+    resultparser.add_argument('data', help='Location of data', type=str)
     resultparser.add_argument('-l', '--large', help='Forces to generate large graphs, with large text', action='store_true')
     resultparser.add_argument('-ns', '--no-show', dest='no_show', help='Do not show generated graph (useful on servers without xorg forwarding)', action='store_true')
     resultparser.add_argument('-s', '--store', help='Store generated graph (in {}/<resultdirname>/<graph_name>.<type>)'.format(loc.get_metaspark_graphs_dir()), action='store_true')
     resultparser.add_argument('-t', '--storetype', nargs=1, help='Preferred storage type (default=pdf)', default='pdf')
-    return resultparser
+    return resultparser, subsubparsers, filterparser, specificparser, mergeparser
 
 # Return True if we found arguments used from this subparser, False otherwise
 # We use this to redirect command parse output to this file, deploy() function 
@@ -93,7 +101,9 @@ def results_args_set(args):
     return args.command == 'results'
 
 # Processing of result commandline args occurs here
-def results(parser, args):
+def results(parsers, args):
+    resultparser, subsubparsers, filterparser, specificparser, mergeparser = parsers
+
     # We explicitly MUST check if matplotlib is available to import
     # If it is not, we cannot process results on the current machine
     if not importer.library_exists('matplotlib'):
@@ -135,12 +145,19 @@ def results(parser, args):
         elif args.type == 'normal':
             import result.filter.normal as n
             n.stats(args.data, *(fdata+fargs+[args.skip_initial]))
-        elif args.type == 'boxplot':
-            import result.filter.specific.boxplot as p
-            p.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         else:
-            parser.print_help()
+            filterparser.print_help()
+    elif args.subcommand == 'specific':
+        fdata = [args.node, args.partition, args.extension, args.amount, args.kind, args.readbuffer]
+        if args.type == 'data_scalability':
+            import result.filter.specific.data_scalability as p
+            p.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+        elif args.type == 'cluster_scalability':
+            import result.filter.specific.cluster_scalability as c
+            c.stats(args.data, *(fdata+fargs+[args.skip_initial]))    
+        else:
+            specificparser.print_help()
     elif args.subcommand == 'merge':
         merge(args.data, args.skip_initial)
     else:
-        parser.print_help()
+        resultparser.print_help()

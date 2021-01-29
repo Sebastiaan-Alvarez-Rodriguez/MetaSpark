@@ -76,7 +76,7 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
         plt.legend(loc='best', frameon=False)
 
     if large:
-        fig.set_size_inches(10, 8)
+        fig.set_size_inches(12, 9)
 
     fig.tight_layout()
 
