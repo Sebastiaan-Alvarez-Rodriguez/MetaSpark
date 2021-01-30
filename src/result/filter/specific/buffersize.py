@@ -27,8 +27,8 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
 
     ovar = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)[0]
 
-    if ovar.name != 'node':
-        print('This plot strategy is only meant for showing varying node-settings')
+    if ovar.name != 'rb':
+        print('This plot strategy is only meant for showing varying buffersize-settings')
         return
 
     reader = Reader(path)
@@ -43,7 +43,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
             print('Unexpected spark-tag: '+str(frame_spark.tag))
             return
         # Box0
-        x0 = getattr(frame_arrow, ovar.name)
+        x0 = getattr(frame_spark, ovar.name)
         data0 = np.add(frame_arrow.i_arr, frame_arrow.c_arr) / 10**9
         # Box1
         x1 = getattr(frame_spark, ovar.name)

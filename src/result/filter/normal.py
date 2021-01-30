@@ -9,12 +9,12 @@ import util.fs as fs
 import util.location as loc
 
 # Plots normal distributions in one figure, using provided filters
-def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+def stats(resultdir, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
     # print('When looking at the 32, pq, 10000, 20480*8 category:')
     reader = Reader(path)
-    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
+    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, compression, amount, kind, rb):
         if large:
             fontsize = 24
             font = {
@@ -36,7 +36,7 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
         ax[0].plot(ds_arr, ds_pdf, label='Arrow-Spark')
         ax[1].plot(spark_arr, spark_pdf, label='Spark')
 
-        ax[0].set(xlabel='Time (s) for '+Dimension.make_id_string(frame_arrow, node, partitions_per_node, extension, amount, kind, rb), ylabel='Probability density', title='Total execution time for Arrow-Spark')
+        ax[0].set(xlabel='Time (s) for '+Dimension.make_id_string(frame_arrow, node, partitions_per_node, extension, compression, amount, kind, rb), ylabel='Probability density', title='Total execution time for Arrow-Spark')
         ax[1].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Spark')
         
         if large:

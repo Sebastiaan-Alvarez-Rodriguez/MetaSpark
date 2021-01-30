@@ -8,11 +8,10 @@ import util.fs as fs
 import util.location as loc
 
 # Plots execution time with variance (percentiles) as a boxplot, using provided filters
-def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+def stats(resultdir, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
-
-    if Dimension.num_open_vars(node, partitions_per_node, extension, amount, kind, rb) > 1:
-        print('Too many open variables: {}'.format(', '.join([str(x) for x in Dimension.open_vars(node, partitions_per_node, extension, amount, kind, rb)])))
+    if Dimension.num_open_vars(node, partitions_per_node, extension, compression, amount, kind, rb) > 1:
+        print('Too many open variables: {}'.format(', '.join([str(x) for x in Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)])))
         return
 
     if large:
@@ -25,7 +24,7 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
         plt.rc('font', **font)
         
 
-    ovar = Dimension.open_vars(node, partitions_per_node, extension, amount, kind, rb)[0]
+    ovar = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)[0]
 
     if ovar.name != "amount":
         print('This plot strategy is only meant for showing varying amount-settings')
@@ -35,7 +34,13 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
     fig, ax = plt.subplots()
 
     plot_items = []
-    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, amount, kind, rb):
+    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, compression, amount, kind, rb):
+        if frame_arrow.tag != 'arrow':
+            print('Unexpected arrow-tag: '+str(frame_arrow.tag))
+            return
+        if frame_spark.tag != 'spark':
+            print('Unexpected spark-tag: '+str(frame_spark.tag))
+            return
         # Box0
         x0 = frame_spark.amount / 10**9
         data0 = np.add(frame_arrow.i_arr, frame_arrow.c_arr) / 10**9
@@ -50,7 +55,6 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
 
     plot_items.sort(key=lambda item: int(item[0])) # Will sort on x0. x0==x1==ovar, the open variable
 
-    # color="lightcoral", alpha=0.75, edgecolor="black"
     bplot0 = ax.boxplot([x[1] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1-0.15)
     plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
     plt.setp(bplot0['medians'], color='midnightblue')
@@ -62,49 +66,17 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
 
 
     # ax.set(xscale='log', yscale='log', xlabel=ovar.axis_description, ylabel='Execution Time (s)', title='Execution Time with Variance for Arrow-Spark')
-    ax.set(xlabel=ovar.axis_description+' ($\\times 10^9$)', ylabel='Execution Time (s)', title='Execution Time for Arrow-Spark')
+    ax.set(xlabel=ovar.axis_description+' ($\\times 10^9$)', ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
 
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()
-    ax2.set_ylabel('Arrow-Spark slowdown (compared to quickest)')
-    ax2.set_ylim(ax.get_ylim())
+    ax2.set_ylabel('Relative speedup of Arrow-Spark', color='forestgreen')
+    ax2.set_ylim((0.7, 1.8))
 
-    arrow_minimal_y = np.min([np.median(x[1]) for x in plot_items])
-    print('Minimal Arrow-Spark median = {}'.format(arrow_minimal_y))
-    # 2nd y axis method 1: apply a function formatter to set other values than for other y-axis
-    # import matplotlib.ticker as mt
-    # formatter = mt.FuncFormatter(lambda x, pos: '{:.2f}'.format(x/arrow_minimal_y))
-    # ax2.yaxis.set_major_formatter(formatter)
-    # 2nd y axis method 2: Manually place ticks locations and labels
-    ax2.yaxis.set_ticks([np.median(x[1]) for x in plot_items])
-    ax2.yaxis.set_ticklabels(['{:.2f}'.format(np.median(x[1])/arrow_minimal_y) for x in plot_items])
-
-    spark_minimal_y = np.min([np.median(x[2]) for x in plot_items])
-    print('Minimal Arrow median = {}'.format(spark_minimal_y))
-    # 3d y axis method:
-    # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/multiple_yaxis_with_spines.html
-    ax3 = ax.twinx()
-    ax3.set_ylabel('Spark slowdown (compared to quickest)')
-    ax3.spines['right'].set_position(('axes', 1.2))
-    # 4 below lines disable all frame lines for 3rd axis
-    ax3.set_frame_on(True)
-    ax3.patch.set_visible(False)
-    for sp in ax3.spines.values():
-        sp.set_visible(False)
-    ax3.spines['right'].set_visible(True) # sets right frameline visible again
-    ax3.set_ylim(ax.get_ylim())
-
-    ax3.yaxis.set_ticks([np.median(x[2]) for x in plot_items])
-    ax3.yaxis.set_ticklabels(['{:.2f}'.format(np.median(x[2])/spark_minimal_y) for x in plot_items])
-
-
+    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark', color='forestgreen')
+    ax2.tick_params(axis='y', labelcolor='forestgreen')
+    plt.grid()
     ax.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
-
-    # if large:
-    #     fig.legend(loc='right', fontsize=18, frameon=False)
-    # else:
-    #     fig.legend(loc='right', frameon=False)
-
 
     if large:
         fig.set_size_inches(16, 9)
@@ -112,7 +84,7 @@ def stats(resultdir, node, partitions_per_node, extension, amount, kind, rb, lar
     fig.tight_layout()
 
     if store_fig:
-          storer.store(resultdir, 'barplot', filetype, plt)
+          storer.store(resultdir, 'boxplot_data_scalability', filetype, plt)
 
     if large:
         plt.rcdefaults()

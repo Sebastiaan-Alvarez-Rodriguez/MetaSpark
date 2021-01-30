@@ -25,7 +25,7 @@ class Reader(object):
             raise RuntimeError('Cannot read data from path "{}"'.format(path_start))
         self.path = path_start
 
-    def _filter_files(self, node=None, partitions_per_node=None, extension=None, amount=None, kind=None, rb=None):
+    def _filter_files(self, node=None, partitions_per_node=None, extension=None, compression=None, amount=None, kind=None, rb=None):
         self.files = []
         for dnode in sorted(fs.ls(self.path, only_dirs=True), key=lambda x: int(x)):
             if not _match(dnode, node):
@@ -35,19 +35,27 @@ class Reader(object):
                 if not _match(dpartitions_per_node, partitions_per_node):
                     printw('PartitionsPerNode={} did not match filter={}'.format(dpartitions_per_node, partitions_per_node))
                     continue
-                for dextension in fs.ls(fs.join(self.path, dnode, dpartitions_per_node), only_dirs=True):
+                for dext_raw in fs.ls(fs.join(self.path, dnode, dpartitions_per_node), only_dirs=True):
+                    if '_' in dext_raw:
+                        dextension, dcompression = dext_raw.split('_')
+                    else:
+                        dextension = dext_raw
+                        dcompression = 'uncompressed'
                     if not _match(dextension, extension):
                         printw('Extension={} did not match filter={}'.format(dextension, extension))
                         continue
-                    for damount in sorted(fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension), only_dirs=True), key=lambda x: int(x)):
+                    if not _match(dcompression, compression):
+                        printw('compression={} did not match filter={}'.format(dcompression, compression))
+                        continue
+                    for damount in sorted(fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dext_raw), only_dirs=True), key=lambda x: int(x)):
                         if not _match(damount, amount):
                             printw('Amount={} did not match filter={}'.format(damount, amount))
                             continue
-                        for dkind in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension, damount), only_dirs=True):
+                        for dkind in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dext_raw, damount), only_dirs=True):
                             if not _match(dkind, kind):
                                 printw('Kind={} did not match filter={}'.format(dkind, kind))
                                 continue
-                            tmp_matched = sorted([x for x in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dextension, damount, dkind), only_files=True, full_paths=True) if x.endswith('.res') or x.endswith('.res_a') or x.endswith('.res_s')], key=lambda x: filename_to_rb(x))
+                            tmp_matched = sorted([x for x in fs.ls(fs.join(self.path, dnode, dpartitions_per_node, dext_raw, damount, dkind), only_files=True, full_paths=True) if x.endswith('.res') or x.endswith('.res_a') or x.endswith('.res_s')], key=lambda x: filename_to_rb(x))
                             for outfile in tmp_matched:
                                 frb = filename_to_rb(outfile)
                                 if not _match(frb, rb):
@@ -57,19 +65,30 @@ class Reader(object):
         self.files.sort()
         print('Matched {} files'.format(len(self.files)))
 
+    # Converts a path to a resultfile to a list of identifying parameters
+    def _path_to_identifiers(self, path_to_file):
+        base = fs.dirname(path_to_file).split(fs.sep())[-5:]
+        if '_' in base[2]:
+            ext, comp = base[2].split('_')
+        else:
+            ext = base[2]
+            comp = 'uncompressed'
+        return [base[0], base[1], ext, comp, base[3], base[4], filename_to_rb(path_to_file)]
+
+
     # Lazily read and return data using a filter
     # Optionally filter the first 2 measurements, which are uncached
     # Data is provided as it0, ct0, a0, it1, ct1, a1
-    def read_ops(self, node=None, partitions_per_node=None, extension=None, amount=None, kind=None, rb=None, skip_initial=True):
-        self._filter_files(node, partitions_per_node, extension, amount, kind, rb)
+    def read_ops(self, node=None, partitions_per_node=None, extension=None, compression=None, amount=None, kind=None, rb=None, skip_initial=True):
+        self._filter_files(node, partitions_per_node, extension, compression, amount, kind, rb)
 
         if len(self.files) > 0:
             if self.files[0].endswith('_a'): # We deal with the 'new' system, with separate arrow and spark result files
                 print('New system detected')
                 for file_a, file_b in zip(self.files[0::2], self.files[1::2]):
 
-                    identifiers_a = fs.dirname(file_a).split(fs.sep())[-5:] + [filename_to_rb(file_a)]
-                    identifiers_b = fs.dirname(file_b).split(fs.sep())[-5:] + [filename_to_rb(file_b)]
+                    identifiers_a = self._path_to_identifiers(file_a)#fs.dirname(file_a).split(fs.sep())[-5:] + [filename_to_rb(file_a)]
+                    identifiers_b = self._path_to_identifiers(file_b)#fs.dirname(file_b).split(fs.sep())[-5:] + [filename_to_rb(file_b)]
                     if identifiers_a != identifiers_b:
                         raise RuntimeError('Error: Found that identifiers are not equivalent of files in same directory')
                     with open(file_a, 'r') as f_a:
@@ -104,7 +123,7 @@ class Frame(object):
     # Initialize a new frame.
     # If skip_initial is set, we skip the first 2 entries of lines.
     # This is useful, because the first 2 entries are without any cached values 
-    def __init__(self, node, partitions_per_node, extension, amount, kind, rb, tag, lines, skip_initial=True):
+    def __init__(self, node, partitions_per_node, extension, compression, amount, kind, rb, tag, lines, skip_initial=True):
         if skip_initial:
             lines = lines[1:]
         itimes = [int(x.split(',', 1)[0]) for idx, x in enumerate(lines)]
@@ -114,6 +133,7 @@ class Frame(object):
         self.node = int(node)
         self.partitions_per_node = int(partitions_per_node)
         self.extension = extension
+        self.compression = compression
         self.amount = int(amount)
         self.kind = kind
         self.rb = int(rb)

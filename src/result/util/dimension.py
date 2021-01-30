@@ -1,12 +1,14 @@
 class Dimension(object):
     @staticmethod
-    def open_var(node, partitions_per_node, extension, amount, kind, rb):
+    def open_var(node, partitions_per_node, extension, compression, amount, kind, rb):
         if node == None:
             return Dimension.OpenVariable('node')
         if partitions_per_node == None:
             return Dimension.OpenVariable('partitions_per_node')
         if extension == None:
             return Dimension.OpenVariable('extension')
+        if compression == None:
+            ans.append(Dimension.OpenVariable('compression'))
         if amount == None:
             return Dimension.OpenVariable('amount')
         if kind == None:
@@ -16,7 +18,7 @@ class Dimension(object):
         raise RuntimeError('No open vars found')
 
     @staticmethod
-    def open_vars(node, partitions_per_node, extension, amount, kind, rb):
+    def open_vars(node, partitions_per_node, extension, compression, amount, kind, rb):
         ans = []
         if node == None:
             ans.append(Dimension.OpenVariable('node'))
@@ -24,6 +26,8 @@ class Dimension(object):
             ans.append(Dimension.OpenVariable('partitions_per_node'))
         if extension == None:
             ans.append(Dimension.OpenVariable('extension'))
+        if compression == None:
+            ans.append(Dimension.OpenVariable('compression'))
         if amount == None:
             ans.append(Dimension.OpenVariable('amount'))
         if kind == None:
@@ -34,12 +38,12 @@ class Dimension(object):
 
 
     @staticmethod
-    def num_open_vars(node, partitions_per_node, extension, amount, kind, rb):
-        return [node, partitions_per_node, extension, amount, kind, rb].count(None)
+    def num_open_vars(node, partitions_per_node, extension, compression, amount, kind, rb):
+        return [node, partitions_per_node, extension, compression, amount, kind, rb].count(None)
 
     @staticmethod
-    def make_id_string(frame, node, partitions_per_node, extension, amount, kind, rb):
-        ovars = Dimension.open_vars(node, partitions_per_node, extension, amount, kind, rb)
+    def make_id_string(frame, node, partitions_per_node, extension, compression, amount, kind, rb):
+        ovars = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)
         return ', '.join(['{}={}'.format(ovar, getattr(frame, str(ovar))) for ovar in ovars])
 
     @staticmethod
@@ -54,12 +58,15 @@ class Dimension(object):
             return 'Partitions per node'
         if name == 'extension':
             return 'Used filetype'
+        if name == 'compression':
+            return 'Used compression format'
         if name == 'amount':
-            return 'data read (entries)'
+            return 'data read [entries]'
         if name == 'kind':
             return 'Spark interaction type'
         if name == 'rb':
-            return 'Readbuffer size (bytes)'
+            return 'Readbuffer size [bytes]'
+        raise RuntimeError('Could not get axis axis_description for "{}"'.format(name))
 
     class OpenVariable(object):
         def __init__(self, name, is_numeric=None, axis_description=None):

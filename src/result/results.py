@@ -61,6 +61,7 @@ def _add_filter_args(parser, type_opts):
     parser.add_argument('-n', '--node', nargs='+', metavar='filter', help='Node filters')
     parser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partitions-per-node filters')
     parser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
+    parser.add_argument('-c', '--compression', nargs='+', metavar='filter', help='Compression filters')
     parser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
     parser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
     parser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
@@ -75,7 +76,7 @@ def _filterparser(subsubparsers):
 
 def _specificparser(subsubparsers):
     specificparser = subsubparsers.add_parser('specific', help='Very specific plots, using filters')
-    _add_filter_args(specificparser, ['data_scalability'])
+    _add_filter_args(specificparser, ['buffersize', 'cluster_scalability', 'data_scalability'])
     return specificparser
 
 # Register 'deploy' subparser modules
@@ -92,7 +93,7 @@ def subparser(subparsers):
     resultparser.add_argument('-l', '--large', help='Forces to generate large graphs, with large text', action='store_true')
     resultparser.add_argument('-ns', '--no-show', dest='no_show', help='Do not show generated graph (useful on servers without xorg forwarding)', action='store_true')
     resultparser.add_argument('-s', '--store', help='Store generated graph (in {}/<resultdirname>/<graph_name>.<type>)'.format(loc.get_metaspark_graphs_dir()), action='store_true')
-    resultparser.add_argument('-t', '--storetype', nargs=1, help='Preferred storage type (default=pdf)', default='pdf')
+    resultparser.add_argument('-t', '--storetype', help='Preferred storage type (default=pdf)', default=['pdf'], type=str)
     return resultparser, subsubparsers, filterparser, specificparser, mergeparser
 
 # Return True if we found arguments used from this subparser, False otherwise
@@ -120,7 +121,7 @@ def results(parsers, args):
     args.storetype = args.storetype[0]
     import result.util.storer as storer # We can only import storer here, as it depends on matplotlib and we don't want to check matplotlib availibility again
     if args.store and not storer.filetype_is_supported(args.storetype):
-        parser.error('--storetype only supports filetypes: {} (not given: {})'.format(', '.join(storer.supported_filetypes()), args.storetype))
+        resultparser.error('--storetype only supports filetypes: {} (not given: {})'.format(', '.join(storer.supported_filetypes()), args.storetype))
         return
 
     if not fs.isdir(loc.get_metaspark_results_dir()):
@@ -129,7 +130,7 @@ def results(parsers, args):
 
 
     if args.subcommand == 'filter':
-        fdata = [args.node, args.partition, args.extension, args.amount, args.kind, args.readbuffer]
+        fdata = [args.node, args.partition, args.extension, args.compression, args.amount, args.kind, args.readbuffer]
         if args.type == 'barplot':
             import result.filter.barplot as b
             b.stats(args.data, *(fdata+fargs+[args.skip_initial]))
@@ -148,13 +149,19 @@ def results(parsers, args):
         else:
             filterparser.print_help()
     elif args.subcommand == 'specific':
-        fdata = [args.node, args.partition, args.extension, args.amount, args.kind, args.readbuffer]
-        if args.type == 'data_scalability':
-            import result.filter.specific.data_scalability as p
-            p.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+        fdata = [args.node, args.partition, args.extension, args.compression, args.amount, args.kind, args.readbuffer]
+        if args.type == 'buffersize':
+            import result.filter.specific.buffersize as b
+            b.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         elif args.type == 'cluster_scalability':
             import result.filter.specific.cluster_scalability as c
-            c.stats(args.data, *(fdata+fargs+[args.skip_initial]))    
+            c.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+        elif args.type == 'compression':
+            import result.filter.specific.compression as c
+            c.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+        elif args.type == 'data_scalability':
+            import result.filter.specific.data_scalability as p
+            p.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         else:
             specificparser.print_help()
     elif args.subcommand == 'merge':
