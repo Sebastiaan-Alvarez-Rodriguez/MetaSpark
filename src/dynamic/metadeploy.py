@@ -8,12 +8,13 @@ import sys
 import time
 
 from config.meta import cfg_meta_instance as metacfg
-from remote.reservation import Reserver
+from remote.reserver import reservation_manager
 from remote.util.deploymode import DeployMode
 from util.executor import Executor
 import util.fs as fs
 import util.location as loc
 from util.printer import *
+import util.printer as up
 
 class MetaDeployState(Enum):
     '''Possible deployment states'''
@@ -25,11 +26,29 @@ class MetaDeployState(Enum):
 
 class MetaDeploy(object):
     '''Object to dynamically pass to meta deployment setups'''
-    
+
     def __init__(self):
-        # We store the deploymode last used to start clusters, 
-        # so we can clean the junk dir in the right location
-        self._deploymode = None 
+        self._reservation_numbers = list()
+        self.index = -1
+        self.amount = -1
+
+    def set_idx_amt(self, index, amount):
+        self.index = index
+        self.amount = amount
+
+    def print(self, *args, **kwargs):
+        up.print('[{}/{}] '.format(self.index, self.amount), end='')
+        up.print(*args, **kwargs)
+
+    def printw(self, string, color=Color.YEL, **kwargs):
+        up.printw('[{}/{}] {}'.format(self.index, self.amount, string), color, **kwargs)
+
+    def printe(self, string, color=Color.RED, **kwargs):
+        up.printe('[{}/{}] {}'.format(self.index, self.amount, string), color, **kwargs)
+
+    def prints(self, string, color=Color.GRN, **kwargs):
+        up.prints('[{}/{}] {}'.format(self.index, self.amount, string), color, **kwargs)
+
     '''
     Block for given command
     Command must return a MetaDeployState, optionally with an additional value
@@ -80,50 +99,51 @@ class MetaDeploy(object):
     If no_interact is True, we never ask stuff to the user, useful for running batch-jobs.
     If launch_spark is True, we launch Spark on allocated nodes. Otherwise, we only allocate nodes
     We try to boot the cluster for retries retries. If we fail, we first sleep retry_sleep_time before retrying.
+    Returns allocation on success, None on failure
     '''
-    def cluster_start(self, time_to_reserve, config_filename, debug_mode, deploy_mode, no_interact, launch_spark=True, retries=5, retry_sleep_time=5):
-        self._deploymode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
+    def cluster_start(self, time_to_reserve, config_filename, debug_mode, deploy_mode, launch_spark=True, retries=5, retry_sleep_time=5):
+        object_deploymode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
+        reservation = None
         for x in range(retries):
-            if launch_spark:
-                from main import start
-                if start(time_to_reserve, config_filename, debug_mode, str(self._deploymode), no_interact):
-                    self._deployment = Reserver.load().deployment
-                    return True
-            else:
-                from main import _start_cluster
-                self._deployment = _start_cluster(time_to_reserve, config_filename, str(self._deploymode), no_interact).deployment
-                return True
-
-            time.sleep(retry_sleep_time)
-        return False
-
-
-    @property
-    def deployment(self):
-        if self._deployment:
-            return self._deployment
-        raise RuntimeError('Have no available deployment!')
+            try:
+                if reservation == None:
+                    from main import _start_cluster
+                    reservation = _start_cluster(time_to_reserve, config_filename)
+                if launch_spark:
+                    from main import _start_spark_on_cluster
+                    if not _start_spark_on_cluster(reservation, debug_mode, object_deploymode):
+                        continue
+                self._reservation_numbers.append(reservation.number)
+                return reservation
+            except Exception as e:
+                printe('Error during cluster start: ', end='')
+                raise e
+                time.sleep(retry_sleep_time)
+        return None
 
     '''
     We stop a cluster using this function.
     We try to stop the cluster for retries retries. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def cluster_stop(self, silent=False, retries=5, retry_sleep_time=5):
+    def cluster_stop(self, reservation, silent=False, retries=5, retry_sleep_time=5):
         from main import stop
+        number = reservation.number
         for x in range(retries):
-            if stop(silent):
+            if stop([number], silent=silent):
+                self._reservation_numbers.remove(number)
                 return True
             time.sleep(retry_sleep_time)
         return False
 
 
     # Remove junk generated during each run. Please use this between runs, not in a run
-    def clean_junk(self, fast=False, datadir=None):
-        if self._deploymode == None: # We don't know where to clean. Clean everywhere
+    def clean_junk(self, reservation, deploy_mode=None, fast=False, datadir=None):
+        if deploy_mode == None: # We don't know where to clean. Clean everywhere
             workdirs = ' '.join([loc.get_spark_work_dir(val) for val in DeployMode])
             fast = False # we don't know the node numbers!
         else:
-            workdirs = loc.get_spark_work_dir(self._deploymode)
+            object_deploymode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
+            workdirs = loc.get_spark_work_dir(object_deploymode)
 
         if fast:
             nfs_log = loc.get_spark_logs_dir()
@@ -136,7 +156,7 @@ class MetaDeploy(object):
             executors.append(Executor(log_command, shell=True))
             datadir = '' if datadir == None else datadir
 
-            for x in self._deployment.nodes:
+            for x in reservation.deployment.nodes:
                 clean_command = 'ssh {} "rm -rf {} {} {}"'.format(x, workdirs, nfs_log, datadir)
 
                 executors.append(Executor(clean_command, shell=True))
@@ -150,6 +170,7 @@ class MetaDeploy(object):
 
     '''
     Deploy an application. We require the following parameters:
+    reservation object for a cluster we have spawned (and this cluster must run Spark of course)
     jarfile name (which exists in <project root>/jars/),
     mainclass inside the jarfile,
     args for the jar (can be None),
@@ -159,10 +180,10 @@ class MetaDeploy(object):
     flamegraph (str) to indicate whether we want to record data for a flamegraph (looks like 30s, 2m, 4h, can be None)
     retries for trying to deploy the application. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def deploy_application(self, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flamegraph=None, retries=5, retry_sleep_time=5):
-        from deploy.deploy import _deploy_application_internal
+    def deploy_application(self, reservation, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flamegraph=None, retries=5, retry_sleep_time=5):
+        from deploy.deploy import _deploy_application
         for x in range(retries):
-            if _deploy_application_internal(jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flamegraph!=None, flamegraph):
+            if _deploy_application(reservation.number, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flamegraph!=None, flamegraph):
                 return True
             time.sleep(retry_sleep_time)
         return False
@@ -171,17 +192,12 @@ class MetaDeploy(object):
     Deploy an application (which is not a Spark application) on all nodes to run in parallel.
     Useful to e.g. generate data
     '''
-    def deploy_nonspark_application(self, command):
-        try:
-            reserver = Reserver.load()
-        except FileNotFoundError as e:
-            printe('No reservation found on remote. Cannot run!')
-            return False
-        except Exception as e:
-            printe('Reservation file found, no longer active')
+    def deploy_nonspark_application(self, reservation, command):
+        if not reservation.validate():
+            printe('Reservation no longer valid. Cannot execute non-spark command: {}'.format(command))
             return False
         executors = []
-        for host in reserver.deployment.nodes:
+        for host in reservation.deployment.nodes:
             executors.append(Executor('ssh {} "{}"'.format(host, command), shell=True))
         Executor.run_all(executors)
         state = Executor.wait_all(executors, stop_on_error=False)

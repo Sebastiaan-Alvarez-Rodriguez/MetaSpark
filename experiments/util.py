@@ -30,20 +30,20 @@ def blockfunc(metadeploy, outputloc, lines_needed):
 # If the data is not in /local, we deploy data from NFS mount to /local first and then proceed.
 # This is indeed a seemingly unnecessary step. However, next time we run this function,
 # we can deploy data straight from /local, which should be lots faster than copying from NFS mount again.
-def deploy_data_fast(metadeploy, generate_cmd, node, extension, compression, amount, kind, partitions_per_node, amounts_multiplier=1):
+def deploy_data_fast(metadeploy, reservation, generate_cmd, node, extension, compression, amount, kind, partitions_per_node, amounts_multiplier=1):
     clean_cmd = 'rm -rf "{}" > /dev/null 2>&1'.format(loc.get_node_raw_ram_dir())
-    if not metadeploy.deploy_nonspark_application(clean_cmd):
+    if not metadeploy.deploy_nonspark_application(reservation, clean_cmd):
         # There were some files that we could not remove, possibly permission issues. Just go on
         printw('Could not "{}" on all nodes!'.format(clean_cmd))
 
     # Generate to /local
-    if not metadeploy.deploy_nonspark_application(generate_cmd):
+    if not metadeploy.deploy_nonspark_application(reservation, generate_cmd):
         printe('!! Fatal error when trying to deploy data using application (command used: "{}")'.format(generate_cmd))
         return False
 
     # make directories on remotes
     mkdir_cmd = 'mkdir -p "{}"'.format(fs.join(loc.get_node_data_dir(DeployMode.RAM), amount, node*partitions_per_node))
-    if not metadeploy.deploy_nonspark_application(mkdir_cmd):
+    if not metadeploy.deploy_nonspark_application(reservation, mkdir_cmd):
         printe('!! Fatal error when trying to mkdir on RAM (command used: "{}")'.format(mkdir_cmd))
         return False
 
@@ -53,12 +53,12 @@ def deploy_data_fast(metadeploy, generate_cmd, node, extension, compression, amo
     frompath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), amount, node*partitions_per_node, configured_extension)
     topath = fs.join(loc.get_node_data_dir(DeployMode.RAM), amount, node*partitions_per_node)
     cp_cmd = 'cp -r "{}" "{}"'.format(frompath, topath)
-    if not metadeploy.deploy_nonspark_application(cp_cmd):
+    if not metadeploy.deploy_nonspark_application(reservation, cp_cmd):
         printe('!! Fatal error when trying to cp data to RAM (command used: "{}")'.format(cp_cmd))
         return False
     if (amounts_multiplier > 1):
         ln_cmd = 'python3 {}/main.py deploy multiplier -n {} -d "{}" -e {}'.format(fs.abspath(), amounts_multiplier, fs.join(topath, configured_extension), extension)
-        if not metadeploy.deploy_nonspark_application(ln_cmd):
+        if not metadeploy.deploy_nonspark_application(reservation, ln_cmd):
             printe('!! Fatal error when trying to create symlinks in RAM')
             return False
     prints('Deployed data successfully to "{}"'.format(topath))

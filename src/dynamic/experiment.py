@@ -3,6 +3,7 @@ import sys
 
 from dynamic.metadeploy import MetaDeploy
 from experiments.interface import ExperimentInterface
+from remote.reserver import reservation_manager
 import util.fs as fs
 import util.importer as imp
 import util.location as loc
@@ -17,19 +18,31 @@ class Experiment(object):
     def __init__(self, location, clazz):
         self.location = location
         self.instance = clazz()
-        self._metaDeploy = MetaDeploy()
+        self._metadeploy = MetaDeploy()
 
     @property
     def metaDeploy(self):
-        return self._metaDeploy
+        return self._metadeploy
 
 
-    def start(self):
-        return self.instance.start(self._metaDeploy)
-
+    def start(self, index, amount):
+        try:
+            self._metadeploy.set_idx_amt(index, amount)
+            return self.instance.start(self._metadeploy)
+        except Exception:
+            print('Registered exception at experimentation runtime, for experiment {}/{}. Cleaning reservations...'.format(index, amount))
+            reservation_manager.stop_selected(self._metadeploy._reservation_numbers)
+            raise
 
     def stop(self):
-        return self.instance.stop(self._metaDeploy)
+        try:
+            return self.instance.stop(self._metadeploy)
+        except Exception:
+            print('Registered exception at experimentation stoptime, for experiment {}/{}. Cleaning reservations...'.format(index, amount))
+            raise
+        finally:
+            reservation_manager.stop_selected(self._metadeploy._reservation_numbers)
+
 
 
 # Load experiment. Assumes 'picked' is a string for 1 experiment, relative to <project root>/experiments/

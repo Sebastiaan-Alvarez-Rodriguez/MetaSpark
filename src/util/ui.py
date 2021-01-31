@@ -24,7 +24,7 @@ def ask_int(question, minval=None, maxval=None):
 def ask_bool(question):
     while True:
         val = input(str(question)+' ').strip().lower()
-        if val in ('y', 'yes', 't', 'true') :
+        if val in ('y', 'yes', 't', 'true'):
             return True
         elif val in ('n', 'no', 'f', 'false'):
             return False

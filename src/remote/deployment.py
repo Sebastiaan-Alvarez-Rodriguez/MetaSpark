@@ -10,13 +10,15 @@ class Deployment(object):
     infiniband:         Return whether to convert ips to infiniband. Does nothing without reservation_number set.
     '''
     def __init__(self, master_port=7077, reservation_number=None, infiniband=True):
-        self._nodes = None
-        self._master_port = None
         if reservation_number != None:
             self._raw_nodes = subprocess.check_output("preserve -llist | grep "+str(reservation_number)+" | awk -F'\\t' '{ print $NF }'", shell=True).decode('utf-8').strip().split()
             self._raw_nodes.sort(key=lambda x: int(x[4:]))
             self._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in self._raw_nodes] if infiniband else self._raw_nodes
+        else:
+            self._raw_nodes = []
+            self._nodes = []
         self.infiniband = infiniband
+        self._master_port = -1
 
     # Returns nodes, which have form 'node042', or, if infiniband flag is set, an infiniband ip address
     @property
@@ -49,12 +51,16 @@ class Deployment(object):
         return self._nodes[1:]
 
     # Returns whether this host is the master node
-    def is_master(self):
-        return self._raw_nodes[0] == socket.gethostname()
+    def is_master(self, host=None):
+        if host == None:
+            host = socket.gethostname()
+        return self._raw_nodes[0] == host
 
     # Returns the global id of this host
-    def get_gid(self):
-        return self._raw_nodes.index(socket.gethostname())
+    def get_gid(self, host=None):
+        if host == None:
+            host = socket.gethostname()
+        return self._raw_nodes.index(host)
 
     # Save deployment to disk
     def persist(self, file):

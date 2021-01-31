@@ -5,7 +5,6 @@ import os
 import socket
 
 from config.meta import cfg_meta_instance as metacfg
-from remote.reservation import Reserver
 import remote.util.ip as ip
 from util.executor import Executor
 import util.fs as fs

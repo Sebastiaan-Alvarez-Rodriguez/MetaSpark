@@ -7,7 +7,7 @@ This framework runs in python `3.5` and lower, so that you can use this framewor
 ## Installing
 Simply run the following to initialize the system on DAS5:
 ```bash
-python3 main.py --init
+python3 main.py init
 ```
 
 ## Usage

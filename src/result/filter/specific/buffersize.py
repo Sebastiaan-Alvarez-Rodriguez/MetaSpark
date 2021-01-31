@@ -71,7 +71,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()
     ax2.set_ylabel('Relative slowdown of Arrow-Spark')
-    # ax2.set_ylim((0.7, 1.0))
+    ax2.set_ylim((0.9, 3.5))
     ax2.plot(np.arange(len(plot_items))+1, [np.median(x[1])/np.median(x[2]) for x in plot_items], label='Relative speedup of Arrow-Spark')
     plt.grid()
 
@@ -83,7 +83,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     fig.tight_layout()
 
     if store_fig:
-          storer.store(resultdir, 'boxplot_cluster_scalability', filetype, plt)
+          storer.store(resultdir, 'boxplot_buffersize', filetype, plt)
 
     if large:
         plt.rcdefaults()

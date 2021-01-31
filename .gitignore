@@ -8,6 +8,7 @@ __pycache__/
 !/experiments/interface.py
 !/experiments/README.md
 !/experiments/util.py
+/reservations
 /recordings/*
 !/recordings/profiles
 /jars/

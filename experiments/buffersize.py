@@ -17,7 +17,6 @@ def get_experiment():
 
 class BufferSizeExperiment(ExperimentInterface):
     '''Buffer size varying experiment. Only Arrow-Spark has to run.'''
-    # TODO WIP: have to either pass buffersize to sparksession in jar, or have to use some deploy --conf option 
 
     # Provides resultdirectory location
     def resultloc(self):
@@ -72,7 +71,7 @@ class BufferSizeExperiment(ExperimentInterface):
 
 
     # Perform an experiment with given parameters
-    def do_experiment(self, metadeploy, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node):
+    def do_experiment(self, metadeploy, reservation, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node):
         # We try to do the experiment a given number of times
         # Each time we crash, we compute how many results we are missing 
         # and try to do that many runs in the next iteration.
@@ -85,7 +84,7 @@ class BufferSizeExperiment(ExperimentInterface):
         if force_generate:
             data_runargs += ' -gf'
         generate_cmd = '$JAVA_HOME/bin/java -jar ~/{} {} > /dev/null 2>&1'.format(self.data_jar, data_runargs)
-        if not eu.deploy_data_fast(metadeploy, generate_cmd, node, extension, compression, self.amount, kind, partitions_per_node, amount_multiplier):
+        if not eu.deploy_data_fast(metadeploy, reservation, generate_cmd, node, extension, compression, self.amount, kind, partitions_per_node, amount_multiplier):
             exit(1)
 
         for extra_arg in ['--spark-only']:
@@ -99,7 +98,7 @@ class BufferSizeExperiment(ExperimentInterface):
                 runargs = self.args.format(kind, partitions, runs_to_perform, loc.get_node_data_dir(self.data_deploy_mode), extension, self.amount, amount_multiplier, compression)
                 runargs += ' {}'.format(extra_arg)
                 final_submit_opts = self.submit_opts.format(outputloc)+' --conf \'spark.sql.parquet.columnarReaderBatchSize={}\''.format(rb)
-                if not metadeploy.deploy_application(self.jar, self.mainclass, runargs, self.extra_jars, final_submit_opts, self.no_results_dir, self.flamegraph_time):
+                if not metadeploy.deploy_application(reservation, self.jar, self.mainclass, runargs, self.extra_jars, final_submit_opts, self.no_results_dir, self.flamegraph_time):
                     printe('!! Fatal error when trying to deploy application !! ({})'.format(outputloc))
                     status = False
                     break
@@ -117,44 +116,26 @@ class BufferSizeExperiment(ExperimentInterface):
                     break
         return status
 
-
     # Start experiment with set parameters
     def start(self, metadeploy):
         self.init_params()
         metadeploy.eprint('Ready to deploy!')
-        
         for partitions_per_node in self.partitions_per_nodes:
             for rb in self.rbs:
                 for extension in self.extensions:
                     for compression in self.compressions:
                         for node in self.nodes:
-                            metadeploy.cluster_stop()
-                            if not metadeploy.cluster_start(self.reserve_time, self.config.format(node), self.debug_mode, str(self.cluster_deploy_mode), self.no_interact):
+                            reservation = metadeploy.cluster_start(self.reserve_time, self.config.format(node), self.debug_mode, str(self.cluster_deploy_mode), self.no_interact)
+                            if not reservation:
                                 printe('!! Fatal error when trying to start cluster !! ({})'.format(outputloc))
                                 return False
                             time.sleep(5) #Give slaves time to connect to master
-                            # metadeploy.clean_junk(datadir=loc.get_node_data_dir(self.data_deploy_mode)) # Clean entire datadir
                             for amount_multiplier in self.amount_multipliers:
                                 for kind in self.kinds:
-                                    metadeploy.clean_junk() # Clean regular junk right after application
-                                    self.do_experiment(metadeploy, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node)
-                                    # metadeploy.clean_junk(datadir=fs.join(loc.get_node_data_dir(self.data_deploy_mode), amount, (node*partitions_per_node), extension)) # Clean junk, including datadir
+                                    metadeploy.clean_junk(reservation, deploy_mode=self.cluster_deploy_mode)
+                                    self.do_experiment(metadeploy, reservation, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node)
+                            metadeploy.cluster_stop(reservation)
 
 
     def stop(self, metadeploy):
-        for rb in self.rbs:
-            for extension in self.extensions:
-                for node in self.nodes:
-                    for amount_multiplier in self.amount_multipliers:
-                        for kind in self.kinds:
-                            outputloc = fs.join(self.resultloc(), node, extension, self.amount*amount_multiplier, kind, '{}.{}.{}.{}.{}.res'.format(node, extension, self.amount*amount_multiplier, kind, rb))
-                            try:
-                                if fs.isfile(outputloc):
-                                    print('Results for "extension: {}, node: {}, amount: {}, kind: {}"'.format(extension, node, self.amount*amount_multiplier, kind))
-                                    cmd = 'cat {} | tail -n 6'.format(outputloc)
-                                    os.command(cmd)
-                            except Exception as e:
-                                pass
-        state = metadeploy.clean_junk()
-        metadeploy.cluster_stop()
-        return state
+        return True

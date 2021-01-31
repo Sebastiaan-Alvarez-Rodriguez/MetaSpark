@@ -37,6 +37,10 @@ def get_metaspark_results_dir():
 def get_metaspark_recordings_dir():
     return fs.join(fs.abspath(), 'recordings')
 
+def get_metaspark_reservations_dir():
+    return fs.join(fs.abspath(), 'reservations')
+
+
 #################### Spark directories ####################
 def get_spark_dir():
     return fs.join(get_metaspark_dep_dir(), 'spark')
@@ -97,7 +101,7 @@ def get_node_ram_dir():
     return '{}/{}/'.format(get_node_raw_ram_dir(), metacfg.ssh.ssh_user_name)
 
 def get_node_raw_ram_dir():
-    return '/dev/shm/'.format(metacfg.ssh.ssh_user_name)
+    return '/dev/shm/{}/'.format(metacfg.ssh.ssh_user_name)
 
 def get_node_data_dir(deploy_mode):
     if deploy_mode == DeployMode.STANDARD:

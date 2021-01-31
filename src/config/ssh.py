@@ -116,7 +116,9 @@ class SSHConfig(object):
     Below, we define a global instance.
     '''
     def __init__(self, name):
-        self.picked = fs.join(get_metaspark_ssh_conf_dir(), name+'.cfg')
+        if not name.endswith('.cfg'):
+            name += '.cfg'
+        self.picked = fs.join(get_metaspark_ssh_conf_dir(), name)
         validate_settings(self.picked)
         self.parser = configparser.ConfigParser()
         self.parser.optionxform=str

@@ -114,6 +114,10 @@ class MetaConfig(object):
     def ssh(self):
         return self._ssh
     
+    # Changes SSH config to a new one
+    def reload_ssh(self, confname):
+        self._ssh = ssh.SSHConfig(confname)
+
     # Persist current settings
     def persist():
         with open(configloc, 'w') as file:

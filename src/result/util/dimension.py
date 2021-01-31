@@ -65,8 +65,9 @@ class Dimension(object):
         if name == 'kind':
             return 'Spark interaction type'
         if name == 'rb':
-            return 'Readbuffer size [bytes]'
+            return 'Batch size [rows]'
         raise RuntimeError('Could not get axis axis_description for "{}"'.format(name))
+
 
     class OpenVariable(object):
         def __init__(self, name, is_numeric=None, axis_description=None):
@@ -75,7 +76,7 @@ class Dimension(object):
             self.axis_description = Dimension._make_axis_description(name) if axis_description == None else axis_description
 
         def val_to_ticks(self, val):
-            if self.is_numeric and val > 1000:
+            if self.name=='amount' and val > 1000:
                 return '{:.2e}'.format(val)
             return str(val)
 
