@@ -35,7 +35,7 @@ class DataScalabilityExperiment(ExperimentInterface):
         self.data_jar = 'arrow-spark-benchmark-1.0-all.jar'
         self.data_args = '-np {} -p {}/ --format {} -nr {}'
         self.data_deploy_mode = DeployMode.RAM # Must remain on RAM deploy mode for this experiment
-        self.first_time_force = False # Force to generate the data, even if the directory exists, when we launch a cluster for the first time
+        self.first_time_force = True # Force to generate the data, even if the directory exists, when we launch a cluster for the first time
 
         # Application deployment params
         self.jar = 'arrow-spark-benchmark-1.0-light.jar'
@@ -64,7 +64,7 @@ class DataScalabilityExperiment(ExperimentInterface):
         self.kinds = ['df']
         self.rbs = [8192]
 
-        self.runs = 3 # We run our implementation and the Spark baseline implementation X times
+        self.runs = 31 # We run our implementation and the Spark baseline implementation X times
         self.retries = 2 # If our application dies X times, we stop trying and move on
         self.appl_sleeptime = 30 # Sleep X seconds between checks
         self.appl_dead_after_tries = 14 # If results have not changed between X block checks, we think the application has died
@@ -87,7 +87,7 @@ class DataScalabilityExperiment(ExperimentInterface):
         if not eu.deploy_data_fast(metadeploy, reservation, generate_cmd, node, extension, compression, self.amount, kind, partitions_per_node, amount_multiplier):
             exit(1)
 
-        configured_extension = '{}_{}'.format(extension, compression) if kind == 'df' and compression != 'uncompressed' else extension
+        configured_extension = '{}_{}'.format(extension, compression) if extension == 'pq' and compression != 'uncompressed' else extension
         for extra_arg in ['--arrow-only', '--spark-only']:
             outputloc = fs.join(self.resultloc(), node, partitions_per_node, configured_extension, self.amount*amount_multiplier, kind, '{}.{}.{}.{}.{}.res_{}'.format(node, extension, self.amount*amount_multiplier, kind, rb, extra_arg[2]))
             runs_to_perform = self.runs

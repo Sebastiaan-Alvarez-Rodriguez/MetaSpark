@@ -35,7 +35,6 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     ovar_amount, ovar_compression = (ovars[0], ovars[1]) if ovars[0].name=='amount' else (ovars[1], ovars[0])
 
     reader = Reader(path)
-    fig, ax = plt.subplots()
 
     plot_items = []
     for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, compression, amount, kind, rb):
@@ -45,6 +44,8 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         if frame_spark.tag != 'spark':
             print('Unexpected spark-tag: '+str(frame_spark.tag))
             return
+        if len(frame_arrow) != len(frame_spark):
+            print('Warning: comparing different sizes')
         # Box0
         amount0 = getattr(frame_arrow, ovar_amount.name) / 10**9
         comp0 = getattr(frame_arrow, ovar_compression.name)
@@ -65,54 +66,55 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         print('No results to plot. Exiting now...')
         return
 
-    plot_items.sort(key=lambda item: int(item[0])) # Will sort on x0. x0==x1==ovar, the open variable
+    plot_items.sort(key=lambda item: int(item[0])) # Will sort on x0, the amount
 
-    # plot_items: (am, cm), 
-    print('Have {} items. Should be paired in threes (uncompressed, snappy, gzip). Gives {} pairs.'.format(len(plot_items), len(plot_items)//3))
-    plot_items_arranged = ((plot_items[x*3], plot_items[x*3+1], plot_items[x*3+2]) for x in range(len(plot_items)//3))
+    for idx, who in enumerate(['Arrow-Spark', 'Default Spark']):
+        fig, ax = plt.subplots()
+        # print('Have {} items. Should be paired in threes (uncompressed, snappy, gzip). Gives {} pairs.'.format(len(plot_items), len(plot_items)//3))
+        plot_items_arranged = ((plot_items[x*3], plot_items[x*3+1], plot_items[x*3+2]) for x in range(len(plot_items)//3))
 
-    # Plot the left boxes, the uncompressed ones
-    bplot0 = ax.boxplot([x[2] for x in plot_items if x[1]=='uncompressed'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1-0.3) #positions=np.arange(len(plot_items))+1-0.15
-    plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
-    plt.setp(bplot0['medians'], color='midnightblue')
+        # Plot the left boxes, the uncompressed ones
+        bplot0 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='uncompressed'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1-0.3) #positions=np.arange(len(plot_items))+1-0.15
+        plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
+        plt.setp(bplot0['medians'], color='midnightblue')
 
-    # Plot the middle boxes, the gzip ones
-    bplot1 = ax.boxplot([x[2] for x in plot_items if x[1]=='gzip'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1) #positions=np.arange(len(plot_items))+1-0.15
-    plt.setp(bplot1['boxes'], color='lightgreen', alpha=0.75, edgecolor='black')
-    plt.setp(bplot1['medians'], color='forestgreen')
+        # Plot the middle boxes, the gzip ones
+        bplot1 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='gzip'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1) #positions=np.arange(len(plot_items))+1-0.15
+        plt.setp(bplot1['boxes'], color='lightgreen', alpha=0.75, edgecolor='black')
+        plt.setp(bplot1['medians'], color='forestgreen')
 
-    bplot2 = ax.boxplot([x[2] for x in plot_items if x[1]=='snappy'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1+0.3) #positions=np.arange(len(plot_items))+1-0.15
-    plt.setp(bplot2['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
-    plt.setp(bplot2['medians'], color='indianred')
+        bplot2 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='snappy'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1+0.3) #positions=np.arange(len(plot_items))+1-0.15
+        plt.setp(bplot2['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
+        plt.setp(bplot2['medians'], color='indianred')
 
-    # Plot Spark stuff:
-    # bplot1 = ax.boxplot([x[3] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1+0.15)
-    # plt.setp(bplot1['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
-    # plt.setp(bplot1['medians'], color='indianred')
-    plt.xticks((np.arange(len(plot_items)//3))+1, labels=[ovar_amount.val_to_ticks(x[0]) for x in plot_items[::3]])
+        # Plot Spark stuff:
+        # bplot1 = ax.boxplot([x[3] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1+0.15)
+        # plt.setp(bplot1['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
+        # plt.setp(bplot1['medians'], color='indianred')
+        plt.xticks((np.arange(len(plot_items)//3))+1, labels=[ovar_amount.val_to_ticks(x[0]) for x in plot_items[::3]])
 
 
-    ax.set(xlabel=ovar_amount.axis_description, ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
+        ax.set(xlabel=ovar_amount.axis_description, ylabel='Execution Time [s]', title='Execution Time for {}'.format(who))
 
-    # add a twin axes and set its limits so it matches the first
-    # ax2 = ax.twinx()
-    # ax2.set_ylabel('Relative slowdown of Arrow-Spark')
-    # # ax2.set_ylim((0.7, 1.0))
-    # ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[3]) for x in plot_items], label='Relative speedup of Arrow-Spark')
-    # plt.grid()
+        # add a twin axes and set its limits so it matches the first
+        # ax2 = ax.twinx()
+        # ax2.set_ylabel('Relative slowdown of Arrow-Spark')
+        # # ax2.set_ylim((0.7, 1.0))
+        # ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[3]) for x in plot_items], label='Relative speedup of Arrow-Spark')
+        # plt.grid()
 
-    ax.legend([bplot0['boxes'][0], bplot1['boxes'][0], bplot2['boxes'][0]], ['uncompressed', 'gzip', 'snappy'], loc='best')
+        ax.legend([bplot0['boxes'][0], bplot1['boxes'][0], bplot2['boxes'][0]], ['uncompressed', 'gzip', 'snappy'], loc='best')
 
-    if large:
-        fig.set_size_inches(16, 9)
+        if large:
+            fig.set_size_inches(16, 9)
 
-    fig.tight_layout()
+        fig.tight_layout()
 
-    if store_fig:
-          storer.store(resultdir, 'boxplot_cluster_scalability', filetype, plt)
+        if store_fig:
+              storer.store(resultdir, 'boxplot_compression_{}'.format(who.replace(' ', '-').split('-')[0].lower()), filetype, plt)
+
+        if not no_show:
+            plt.show()
 
     if large:
         plt.rcdefaults()
-
-    if not no_show:
-        plt.show()

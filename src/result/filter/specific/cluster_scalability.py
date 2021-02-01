@@ -42,6 +42,8 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         if frame_spark.tag != 'spark':
             print('Unexpected spark-tag: '+str(frame_spark.tag))
             return
+        if len(frame_arrow) != len(frame_spark):
+            print('Warning: comparing different sizes')
         # Box0
         x0 = getattr(frame_arrow, ovar.name)
         data0 = np.add(frame_arrow.i_arr, frame_arrow.c_arr) / 10**9
@@ -71,7 +73,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()
     ax2.set_ylabel('Relative slowdown of Arrow-Spark')
-    # ax2.set_ylim((0.7, 1.0))
+    ax2.set_ylim((0.9, 1.046))
     ax2.plot(np.arange(len(plot_items))+1, [np.median(x[1])/np.median(x[2]) for x in plot_items], label='Relative speedup of Arrow-Spark')
     plt.grid()
 

@@ -47,7 +47,7 @@ def deploy_data_fast(metadeploy, reservation, generate_cmd, node, extension, com
         printe('!! Fatal error when trying to mkdir on RAM (command used: "{}")'.format(mkdir_cmd))
         return False
 
-    configured_extension = '{}_{}'.format(extension, compression) if kind == 'df' and compression != 'uncompressed' else extension
+    configured_extension = '{}_{}'.format(extension, compression) if extension == 'pq' and compression != 'uncompressed' else extension
 
     # copy data to RAM directory
     frompath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), amount, node*partitions_per_node, configured_extension)

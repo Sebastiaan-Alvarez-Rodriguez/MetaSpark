@@ -10,7 +10,6 @@ import util.location as loc
 # Plots execution time with variance (percentiles) as a boxplot, using provided filters
 def stats(resultdir, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
-
     if Dimension.num_open_vars(node, partitions_per_node, extension, compression, amount, kind, rb) > 1:
         print('Too many open variables: {}'.format(', '.join([str(x) for x in Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)])))
         return
@@ -27,8 +26,8 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
 
     ovar = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)[0]
 
-    if ovar.name != 'rb':
-        print('This plot strategy is only meant for showing varying buffersize-settings')
+    if ovar.name != "amount":
+        print('This plot strategy is only meant for showing varying amount-settings')
         return
 
     reader = Reader(path)
@@ -45,10 +44,10 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         if len(frame_arrow) != len(frame_spark):
             print('Warning: comparing different sizes')
         # Box0
-        x0 = getattr(frame_spark, ovar.name)
+        x0 = frame_spark.amount / 10**9
         data0 = np.add(frame_arrow.i_arr, frame_arrow.c_arr) / 10**9
         # Box1
-        x1 = getattr(frame_spark, ovar.name)
+        x1 = frame_spark.amount / 10**9
         data1 = np.add(frame_spark.i_arr, frame_spark.c_arr) / 10**9
         plot_items.append((x0, data0, data1,))
 
@@ -68,15 +67,17 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     plt.xticks(np.arange(len(plot_items))+1, labels=[ovar.val_to_ticks(x[0]) for x in plot_items])
 
 
-    ax.set(xlabel=ovar.axis_description, ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
+    # ax.set(xscale='log', yscale='log', xlabel=ovar.axis_description, ylabel='Execution Time (s)', title='Execution Time with Variance for Arrow-Spark')
+    ax.set(xlabel=ovar.axis_description+' ($\\times 10^9$)', ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
 
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()
-    ax2.set_ylabel('Relative slowdown of Arrow-Spark')
-    ax2.set_ylim((0.9, 3.5))
-    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[1])/np.median(x[2]) for x in plot_items], label='Relative speedup of Arrow-Spark')
-    plt.grid()
+    ax2.set_ylabel('Relative speedup of Arrow-Spark')
+    # ax2.set_ylim((0.7, 1.8))
 
+    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark')
+    # ax2.tick_params(axis='y', labelcolor='forestgreen')
+    plt.grid()
     ax.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
 
     if large:
@@ -85,7 +86,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     fig.tight_layout()
 
     if store_fig:
-          storer.store(resultdir, 'boxplot_buffersize', filetype, plt)
+          storer.store(resultdir, 'boxplot_row_vs_columnar', filetype, plt)
 
     if large:
         plt.rcdefaults()

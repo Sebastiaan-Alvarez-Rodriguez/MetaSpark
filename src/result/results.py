@@ -75,7 +75,7 @@ def _filterparser(subsubparsers):
 
 def _specificparser(subsubparsers):
     specificparser = subsubparsers.add_parser('specific', help='Very specific plots, using filters')
-    _add_filter_args(specificparser, ['buffersize', 'cluster_scalability', 'data_scalability'])
+    _add_filter_args(specificparser, ['buffersize', 'cluster_scalability', 'compression', 'data_scalability', 'row_vs_columnar'])
     return specificparser
 
 # Register 'deploy' subparser modules
@@ -161,6 +161,9 @@ def results(parsers, args):
         elif args.type == 'data_scalability':
             import result.filter.specific.data_scalability as p
             p.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+        elif args.type == 'row_vs_columnar':
+            import result.filter.specific.row_vs_columnar as r
+            r.stats(args.data, *(fdata+fargs+[args.skip_initial]))
         else:
             specificparser.print_help()
     elif args.subcommand == 'merge':

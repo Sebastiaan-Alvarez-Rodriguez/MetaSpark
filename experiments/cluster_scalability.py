@@ -88,7 +88,7 @@ class ClusterScalabilityExperiment(ExperimentInterface):
             exit(1)
 
         for extra_arg in ['--arrow-only', '--spark-only']:
-            configured_extension = '{}_{}'.format(extension, compression) if kind == 'df' and compression != 'uncompressed' else extension
+            configured_extension = '{}_{}'.format(extension, compression) if extension == 'pq' and compression != 'uncompressed' else extension
             outputloc = fs.join(self.resultloc(), node, partitions_per_node, configured_extension, self.amount*amount_multiplier, kind, '{}.{}.{}.{}.{}.res_{}'.format(node, extension, self.amount*amount_multiplier, kind, rb, extra_arg[2]))
             runs_to_perform = self.runs
 

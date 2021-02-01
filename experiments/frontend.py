@@ -25,7 +25,7 @@ class FrontendExperiment(ExperimentInterface):
 
     def init_params(self):
         # Cluster spawning params
-        self.reserve_time = '10:00:00'
+        self.reserve_time = '20:00:00'
         self.config = '{}.cfg'
         self.debug_mode = False # less printing
         self.cluster_deploy_mode = DeployMode.LOCAL
@@ -88,7 +88,7 @@ class FrontendExperiment(ExperimentInterface):
             exit(1)
 
         for extra_arg in ['--arrow-only', '--spark-only']:
-            configured_extension = '{}_{}'.format(extension, compression) if kind == 'df' and compression != 'uncompressed' else extension
+            configured_extension = '{}_{}'.format(extension, compression) if extension == 'pq' and compression != 'uncompressed' else extension
             outputloc = fs.join(self.resultloc(), node, partitions_per_node, configured_extension, self.amount*amount_multiplier, kind, '{}.{}.{}.{}.{}.res_{}'.format(node, extension, self.amount*amount_multiplier, kind, rb, extra_arg[2]))
             runs_to_perform = self.runs
 
