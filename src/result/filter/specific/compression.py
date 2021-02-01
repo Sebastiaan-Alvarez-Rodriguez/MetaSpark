@@ -24,7 +24,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
             'size'   : fontsize
         }
         plt.rc('font', **font)
-        
+    plt.rc('axes', axisbelow=True)
 
     ovars = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)
     has_compression = 'compression' in (x.name for x in ovars)
@@ -94,7 +94,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         plt.xticks((np.arange(len(plot_items)//3))+1, labels=[ovar_amount.val_to_ticks(x[0]) for x in plot_items[::3]])
 
 
-        ax.set(xlabel=ovar_amount.axis_description, ylabel='Execution Time [s]', title='Execution Time for {}'.format(who))
+        ax.set(xlabel=ovar_amount.axis_description+' ($\\times 10^9$)', ylabel='Execution Time [s]', title='Execution Time for {}'.format(who))
 
         # add a twin axes and set its limits so it matches the first
         # ax2 = ax.twinx()
@@ -103,7 +103,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         # ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[3]) for x in plot_items], label='Relative speedup of Arrow-Spark')
         # plt.grid()
 
-        ax.legend([bplot0['boxes'][0], bplot1['boxes'][0], bplot2['boxes'][0]], ['uncompressed', 'gzip', 'snappy'], loc='best')
+        plt.legend([bplot0['boxes'][0], bplot1['boxes'][0], bplot2['boxes'][0]], ['uncompressed', 'gzip', 'snappy'], loc='best')
 
         if large:
             fig.set_size_inches(16, 9)

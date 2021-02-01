@@ -23,7 +23,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
             'size'   : fontsize
         }
         plt.rc('font', **font)
-        
+    plt.rc('axes', axisbelow=True)
 
     ovar = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)[0]
 
@@ -67,17 +67,17 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     plt.setp(bplot1['medians'], color='indianred')
     plt.xticks(np.arange(len(plot_items))+1, labels=[ovar.val_to_ticks(x[0]) for x in plot_items])
 
-
     ax.set(xlabel=ovar.axis_description, ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
 
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()
+    ax2.set_ylim((0.94, 1.04))
     ax2.set_ylabel('Relative slowdown of Arrow-Spark')
-    ax2.set_ylim((0.9, 1.046))
-    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[1])/np.median(x[2]) for x in plot_items], label='Relative speedup of Arrow-Spark')
+    ax2.tick_params(axis='y', colors='steelblue')
+    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[1])/np.median(x[2]) for x in plot_items], label='Relative speedup of Arrow-Spark', marker='o', color='steelblue')
     plt.grid()
 
-    ax.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
+    plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
 
     if large:
         fig.set_size_inches(16, 9)
