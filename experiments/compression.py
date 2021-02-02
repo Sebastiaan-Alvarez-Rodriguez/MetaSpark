@@ -1,15 +1,10 @@
-import os
-import subprocess
-import time
-
 from experiments.interface import ExperimentInterface
+import experiments.benchmark_base as base
 import experiments.util as eu
-from dynamic.metadeploy import MetaDeployState
 from remote.util.deploymode import DeployMode
 import util.fs as fs
 import util.location as loc
 from util.printer import *
-
 
 def get_experiment():
     '''Pass your defined experiment class in this function so MetaSpark can find it'''
@@ -33,6 +28,7 @@ class CompressionExperiment(ExperimentInterface):
 
         # Data deployment params
         self.data_jar = 'arrow-spark-benchmark-1.0-all.jar'
+        self.random_data = False
         self.data_args = '-np {} -p {}/ --format {} -nr {} -cl {}'
         self.data_deploy_mode = DeployMode.RAM # Must remain on RAM deploy mode for this experiment
         self.first_time_force = False # Force to generate the data, even if the directory exists, when we launch a cluster for the first time
@@ -70,72 +66,11 @@ class CompressionExperiment(ExperimentInterface):
         self.appl_dead_after_tries = 20 # If results have not changed between X block checks, we think the application has died
 
 
-    # Perform an experiment with given parameters
-    def do_experiment(self, metadeploy, reservation, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node):
-        # We try to do the experiment a given number of times
-        # Each time we crash, we compute how many results we are missing 
-        # and try to do that many runs in the next iteration.
-        status = True
-
-        # Generate to /local
-        deploypath = loc.get_node_data_dir(DeployMode.LOCAL)
-        data_runargs = self.data_args.format(node*partitions_per_node, deploypath, extension, self.amount, compression)
-        force_generate = self.first_time_force
-        if force_generate:
-            data_runargs += ' -gf'
-        generate_cmd = '$JAVA_HOME/bin/java -jar ~/{} {} > /dev/null 2>&1'.format(self.data_jar, data_runargs)
-        if not eu.deploy_data_fast(metadeploy, reservation, generate_cmd, node, extension, compression, self.amount, kind, partitions_per_node, amount_multiplier):
-            exit(1)
-
-        for extra_arg in ['--arrow-only', '--spark-only']:
-            configured_extension = '{}_{}'.format(extension, compression) if extension == 'pq' and compression != 'uncompressed' else extension
-            outputloc = fs.join(self.resultloc(), node, partitions_per_node, configured_extension, self.amount*amount_multiplier, kind, '{}.{}.{}.{}.{}.res_{}'.format(node, extension, self.amount*amount_multiplier, kind, rb, extra_arg[2]))
-            runs_to_perform = self.runs
-
-            for x in range(self.retries):
-                partitions = node*partitions_per_node
-                
-                runargs = self.args.format(kind, partitions, runs_to_perform, loc.get_node_data_dir(self.data_deploy_mode), extension, self.amount, amount_multiplier, compression)
-                runargs += ' {}'.format(extra_arg)
-                final_submit_opts = self.submit_opts.format(outputloc)+' --conf \'spark.sql.parquet.columnarReaderBatchSize={}\''.format(rb)
-                if not metadeploy.deploy_application(reservation, self.jar, self.mainclass, runargs, self.extra_jars, final_submit_opts, self.no_results_dir, self.flamegraph_time):
-                    printe('!! Fatal error when trying to deploy application !! ({})'.format(outputloc))
-                    status = False
-                    break
-
-                if metadeploy.block(eu.blockfunc, args=(metadeploy, outputloc, runs_to_perform), sleeptime=self.appl_sleeptime, dead_after_retries=self.appl_dead_after_tries):
-                    break # We are done!
-                else: # Something bad happened. Do remaining runs in next iteration
-                    finished_runs = eu.check_num_results(outputloc)
-                    runs_to_perform -= (finished_runs-1) #-1 because we need a 'cold buffer' run before going on
-                    outputloc += '_'+str(x)
-                if x == self.retries-1:
-                    metadeploy.eprint('\n\n!!!FATALITY!!! for {}\n\n'.format(outputloc))
-                    print('\n\n!!!FATALITY!!! for {}\n\n'.format(outputloc))
-                    status = False
-                    break
-        return status
-
-
     # Start experiment with set parameters
     def start(self, metadeploy):
         self.init_params()
         metadeploy.eprint('Ready to deploy!')
-        for partitions_per_node in self.partitions_per_nodes:
-            for rb in self.rbs:
-                for extension in self.extensions:
-                    for compression in self.compressions:
-                        for node in self.nodes:
-                            reservation = metadeploy.cluster_start(self.reserve_time, self.config.format(node), self.debug_mode, str(self.cluster_deploy_mode), self.no_interact)
-                            if not reservation:
-                                printe('!! Fatal error when trying to start cluster !! ({})'.format(outputloc))
-                                return False
-                            time.sleep(5) #Give slaves time to connect to master
-                            for amount_multiplier in self.amount_multipliers:
-                                for kind in self.kinds:
-                                    metadeploy.clean_junk(reservation, deploy_mode=self.cluster_deploy_mode)
-                                    self.do_experiment(metadeploy, reservation, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node)
-                            metadeploy.cluster_stop(reservation)
+        base.iterate_experiments(self, metadeploy)
 
 
     def stop(self, metadeploy):

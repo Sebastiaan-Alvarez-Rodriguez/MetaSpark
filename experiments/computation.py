@@ -8,19 +8,19 @@ from util.printer import *
 
 def get_experiment():
     '''Pass your defined experiment class in this function so MetaSpark can find it'''
-    return FrontendExperiment
+    return ComputeExperiment
 
-class FrontendExperiment(ExperimentInterface):
-    '''Data scalability experiment'''
+class ComputeExperiment(ExperimentInterface):
+    '''Computation experiment. Uses randomly generated data instead of regular'''
 
     # Provides resultdirectory location
     def resultloc(self):
-        return fs.join(fs.abspath(), '..', 'frontend_res')
+        return fs.join(fs.abspath(), '..', 'computation_res')
 
 
     def init_params(self):
         # Cluster spawning params
-        self.reserve_time = '20:00:00'
+        self.reserve_time = '12:00:00'
         self.config = '{}.cfg'
         self.debug_mode = False # less printing
         self.cluster_deploy_mode = DeployMode.LOCAL
@@ -28,10 +28,10 @@ class FrontendExperiment(ExperimentInterface):
 
         # Data deployment params
         self.data_jar = 'arrow-spark-benchmark-1.0-all.jar'
-        self.random_data = False
+        self.random_data = True
         self.data_args = '-np {} -p {}/ --format {} -nr {} -cl {}'
         self.data_deploy_mode = DeployMode.RAM # Must remain on RAM deploy mode for this experiment
-        self.first_time_force = True # Force to generate the data, even if the directory exists, when we launch a cluster for the first time
+        self.first_time_force = False # Force to generate the data, even if the directory exists, when we launch a cluster for the first time
 
         # Application deployment params
         self.jar = 'arrow-spark-benchmark-1.0-light.jar'
@@ -52,26 +52,24 @@ class FrontendExperiment(ExperimentInterface):
 
         # Experiment params
         self.partitions_per_nodes = [16] # One DAS5 node has 16 physical, 32 logical cores, we use an X amount of partitions per physical core
-        self.nodes = [8]
+        self.nodes = [4, 8, 16, 32]
         self.amount = 600000000
-        self.amount_multipliers = [16] # makes number of rows this factor larger using symlinks
+        self.amount_multipliers = [64] # makes number of rows this factor larger using symlinks
         self.extensions = ['pq']
         self.compressions = ['uncompressed']
-        self.kinds = ['df', 'df_sql', 'ds', 'rdd']
+        self.kinds = ['df']
         self.rbs = [8192]
 
         self.runs = 31 # We run our implementation and the Spark baseline implementation X times
         self.retries = 2 # If our application dies X times, we stop trying and move on
         self.appl_sleeptime = 30 # Sleep X seconds between checks
-        self.appl_dead_after_tries = 20 # If results have not changed between X block checks, we think the application has died
-
+        self.appl_dead_after_tries = 14 # If results have not changed between X block checks, we think the application has died
 
     # Start experiment with set parameters
     def start(self, metadeploy):
         self.init_params()
         metadeploy.eprint('Ready to deploy!')
         base.iterate_experiments(self, metadeploy)
-
 
     def stop(self, metadeploy):
         return True

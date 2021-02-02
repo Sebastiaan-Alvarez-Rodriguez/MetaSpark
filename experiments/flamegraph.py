@@ -33,6 +33,7 @@ class BaseExperiment(ExperimentInterface):
 
         # Data deployment params
         self.data_jar = 'arrow-spark-benchmark-1.0-all.jar'
+        self.random_data = False
         self.data_args = '-np {} -rb {} -p {}/ --format {} -nr {}'
         self.data_deploy_mode = DeployMode.RAM
         self.first_time_force = False # Force to generate the data, even if the directory exists, when we launch a cluster for the first time

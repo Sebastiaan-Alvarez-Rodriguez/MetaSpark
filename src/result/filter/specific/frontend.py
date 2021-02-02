@@ -27,8 +27,8 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
 
     ovar = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)[0]
 
-    if ovar.name != 'node':
-        print('This plot strategy is only meant for showing varying node-settings')
+    if ovar.name != 'kind':
+        print('This plot strategy is only meant for showing varying kind-settings')
         return
 
     reader = Reader(path)
@@ -56,7 +56,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         print('No results to plot. Exiting now...')
         return
 
-    plot_items.sort(key=lambda item: int(item[0])) # Will sort on x0. x0==x1==ovar, the open variable
+    plot_items.sort(key=lambda item: item[0]) # Will sort on x0. x0==x1==ovar, the open variable
 
     bplot0 = ax.boxplot([x[1] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1-0.15)
     plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
@@ -71,7 +71,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
 
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()
-    ax2.set_ylim((0.65, 1.00))
+    # ax2.set_ylim((0.65, 1.00))
     ax2.set_ylabel('Relative speedup of Arrow-Spark')
     ax2.tick_params(axis='y', colors='steelblue')
     ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark', marker='o', color='steelblue')

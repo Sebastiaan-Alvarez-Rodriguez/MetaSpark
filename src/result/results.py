@@ -75,7 +75,7 @@ def _filterparser(subsubparsers):
 
 def _specificparser(subsubparsers):
     specificparser = subsubparsers.add_parser('specific', help='Very specific plots, using filters')
-    _add_filter_args(specificparser, ['buffersize', 'cluster_scalability', 'compression', 'data_scalability', 'row_vs_columnar'])
+    _add_filter_args(specificparser, ['buffersize', 'cluster_scalability', 'compression', 'data_scalability', 'frontend', 'row_vs_columnar'])
     return specificparser
 
 # Register 'deploy' subparser modules
@@ -150,22 +150,21 @@ def results(parsers, args):
     elif args.subcommand == 'specific':
         fdata = [args.node, args.partition, args.extension, args.compression, args.amount, args.kind, args.readbuffer]
         if args.type == 'buffersize':
-            import result.filter.specific.buffersize as b
-            b.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+            import result.filter.specific.buffersize as plotter
         elif args.type == 'cluster_scalability':
-            import result.filter.specific.cluster_scalability as c
-            c.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+            import result.filter.specific.cluster_scalability as plotter
         elif args.type == 'compression':
-            import result.filter.specific.compression as c
-            c.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+            import result.filter.specific.compression as plotter
         elif args.type == 'data_scalability':
-            import result.filter.specific.data_scalability as p
-            p.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+            import result.filter.specific.data_scalability as plotter
+        elif args.type == 'frontend':
+            import result.filter.specific.frontend as plotter
         elif args.type == 'row_vs_columnar':
-            import result.filter.specific.row_vs_columnar as r
-            r.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+            import result.filter.specific.row_vs_columnar as plotter
         else:
             specificparser.print_help()
+            return
+        plotter.stats(args.data, *(fdata+fargs+[args.skip_initial]))
     elif args.subcommand == 'merge':
         merge(args.data, args.skip_initial)
     else:
