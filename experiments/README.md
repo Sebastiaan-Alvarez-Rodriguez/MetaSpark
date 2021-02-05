@@ -48,7 +48,7 @@ After you start a cluster, you probably want to distribute or generate some data
 #### Copying data to all nodes
 If we really need to copy data from the Spark master node to every executor node, we execute:
 ```python
-metadeploy.deploy_data(['/local/username/bigdata0.abc', '/local/username/bigdatafolder/'], DeployMode.RAM, skip=True, subpath='/sub/')
+metadeploy.deploy_data(reservation, ['/local/username/bigdata0.abc', '/local/username/bigdatafolder/'], DeployMode.RAM, skip=True, subpath='/sub/')
 ```
 This places given file `/local/username/bigdata0.abc` and directory `/local/username/bigdatafolder/` (which are local on the DAS5 main node), inside the `RAMDisk` of every allocated node.
 `RAMDisk` is a memory-mapped filesystem found on every node, in `/dev/shm`.

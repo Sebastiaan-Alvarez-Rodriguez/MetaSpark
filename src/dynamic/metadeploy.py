@@ -177,13 +177,13 @@ class MetaDeploy(object):
     extra_jars (which exist in <project root>/jars/) to submit alongside the jarfile (can be None),
     submit_opts (str) extra options for spark-submit (for advanced users),
     no_resultdir (bool) to indicate whether we should skip making a result directory or not,
-    flamegraph (str) to indicate whether we want to record data for a flamegraph (looks like 30s, 2m, 4h, can be None)
+    flamegraph_time (str) to indicate whether we want to record data for a flamegraph (looks like 30s, 2m, 4h, can be None)
     retries for trying to deploy the application. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def deploy_application(self, reservation, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flamegraph=None, retries=5, retry_sleep_time=5):
+    def deploy_application(self, reservation, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, retries=5, retry_sleep_time=5):
         from deploy.deploy import _deploy_application
         for x in range(retries):
-            if _deploy_application(reservation.number, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flamegraph!=None, flamegraph):
+            if _deploy_application(reservation.number, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
                 return True
             time.sleep(retry_sleep_time)
         return False
@@ -210,21 +210,28 @@ class MetaDeploy(object):
 
     '''
     Deploy data on the local drive of a node. We require:
+    reservation_or_number the reservation object, or int reservation number to use
     datalist the files/directories to deploy, as a list of string filenames (which exist in <project root>/data/),
     deploy_mode the deploy-mode for the data. Determines whether we place data on the NFS mount, local disk, RAMdisk etc,
     skip value (if True, we skip copying data that already exists in a particular node's local drive),
     subpath the extra path to append to the rsync target location
     retries for trying to deploy the application. If we fail, we first sleep retry_sleep_time before retrying.
     '''
-    def deploy_data(self, datalist, deploy_mode, skip, subpath='', retries=5, retry_sleep_time=5):
+    def deploy_data(self, reservation_or_number, datalist, deploy_mode, skip, subpath='', retries=5, retry_sleep_time=5):
         dmode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
         dlist = listdatalist if isinstance(datalist, list) else [datalist]
-        from deploy.deploy import _deploy_data_internal
+        from deploy.deploy import _deploy_data
         for x in range(retries):
-            if _deploy_data_internal(dlist, dmode, skip, subpath=subpath):
+            if _deploy_data(reservation_or_number, dlist, dmode, skip, subpath=subpath):
                 return True
             time.sleep(retry_sleep_time)
         return False
+
+
+    def deploy_flamegraph(self, reservation_or_number, flame_graph_duration='30s', only_master=False, only_worker=False):
+        if flame_graph_duration != None:
+            from deploy.deploy import _flamegraph
+            _flamegraph(reservation_or_number, only_master, only_worker)
 
 
     # Print method to print to stderr

@@ -61,9 +61,9 @@ class Dimension(object):
         if name == 'compression':
             return 'Used compression format'
         if name == 'amount':
-            return 'data read [entries]'
+            return 'data read [rows]'
         if name == 'kind':
-            return 'Spark interaction type'
+            return 'Spark data representation type'
         if name == 'rb':
             return 'Batch size [rows]'
         raise RuntimeError('Could not get axis axis_description for "{}"'.format(name))

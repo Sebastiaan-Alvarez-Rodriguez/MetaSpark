@@ -31,7 +31,7 @@ def blockfunc(metadeploy, outputloc, lines_needed):
 # This is indeed a seemingly unnecessary step. However, next time we run this function,
 # we can deploy data straight from /local, which should be lots faster than copying from NFS mount again.
 def deploy_data_fast(metadeploy, reservation, generate_cmd, node, extension, amount, kind, partitions_per_node, extension_filepath, amounts_multiplier=1):
-    clean_cmd = 'rm -rf "{}" > /dev/null 2>&1'.format(loc.get_node_raw_ram_dir())
+    clean_cmd = 'rm -rf "{}" > /dev/null 2>&1'.format(loc.get_node_ram_dir())
     if not metadeploy.deploy_nonspark_application(reservation, clean_cmd):
         # There were some files that we could not remove, possibly permission issues. Just go on
         printw('Could not "{}" on all nodes!'.format(clean_cmd))

@@ -39,7 +39,7 @@ class CompressionExperiment(ExperimentInterface):
         self.args = '{} -np {} -r {} -p {}/ --format {} -nr {} -dm {} -cl {}'
         self.extra_jars = None
         self.offheap_memory = None #1024*1024*1 # 1 mb of off-heap memory per JVM. Set to None to disable offheap memory
-        shared_submit_ops = '-Dio.netty.allocator.directMemoryCacheAlignment=64 -Dfile={0}' # -XX:+FlightRecorder
+        shared_submit_ops = '-Dio.netty.allocator.directMemoryCacheAlignment=64 -Dfile={0} -XX:+FlightRecorder'
         self.submit_opts = '\
         --conf \'spark.executor.extraJavaOptions={0}\' \
         --conf \'spark.driver.extraJavaOptions={0}\' \
@@ -54,9 +54,9 @@ class CompressionExperiment(ExperimentInterface):
         self.partitions_per_nodes = [16] # One DAS5 node has 16 physical, 32 logical cores, we use an X amount of partitions per physical core
         self.nodes = [8]
         self.amount = 600000000
-        self.amount_multipliers = [4, 8, 16, 32, 64] # makes number of rows this factor larger using symlinks
+        self.amount_multipliers = [4, 8, 16, 32, 64]
         self.extensions = ['pq']
-        self.compressions = ['uncompressed', 'snappy', 'gzip'] # 'uncompressed', 'lz0', 'brotli', 'lz4', 'zstd'
+        self.compressions = ['gzip', 'uncompressed', 'snappy']
         self.kinds = ['df']
         self.rbs = [8192]
 

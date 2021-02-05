@@ -36,7 +36,7 @@ class ComputeExperiment(ExperimentInterface):
         # Application deployment params
         self.jar = 'arrow-spark-benchmark-1.0-light.jar'
         self.mainclass = 'org.arrowspark.benchmark.Benchmark'
-        self.args = '{} -np {} -r {} -p {}/ --format {} -nr {} -dm {}  -cl {}'
+        self.args = '{} -np {} -r {} -p {}/ --format {} -nr {} -dm {}  -cl {} --compute'
         self.extra_jars = None
         self.offheap_memory = None #1024*1024*1 # 1 mb of off-heap memory per JVM. Set to None to disable offheap memory
         shared_submit_ops = '-Dio.netty.allocator.directMemoryCacheAlignment=64 -Dfile={0}' # -XX:+FlightRecorder

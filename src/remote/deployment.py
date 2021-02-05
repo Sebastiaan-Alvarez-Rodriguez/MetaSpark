@@ -60,7 +60,7 @@ class Deployment(object):
     def get_gid(self, host=None):
         if host == None:
             host = socket.gethostname()
-        return self._raw_nodes.index(host)
+        return self._raw_nodes.index(host) if host.startswith('node') else self._nodes.index(host)
 
     # Save deployment to disk
     def persist(self, file):

@@ -65,21 +65,26 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     bplot1 = ax.boxplot([x[2] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1+0.15)
     plt.setp(bplot1['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
     plt.setp(bplot1['medians'], color='indianred')
-    plt.xticks(np.arange(len(plot_items))+1, labels=[ovar.val_to_ticks(x[0]) for x in plot_items])
+
+    import math
+    ticks = ['$2^{'+str(int(math.log(x[0], 2)))+'}$' for x in plot_items]
+    # ticks = [ovar.val_to_ticks(x[0]) for x in plot_items]
+    plt.xticks(np.arange(len(plot_items))+1, labels=ticks)
 
 
     ax.set(xlabel=ovar.axis_description, ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
-
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()
-    ax2.set_ylim((0.9, 3.5))
+    # ax2.set_ylim((0.9, 3.5))
     ax2.set_ylabel('Relative slowdown of Arrow-Spark')
     ax2.tick_params(axis='y', colors='steelblue')
-    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[1])/np.median(x[2]) for x in plot_items], label='Relative speedup of Arrow-Spark', marker='o', color='steelblue')
+    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[1])/np.median(x[2]) for x in plot_items], label='Relative speedup of Arrow-Spark', marker='D', markersize=10, color='steelblue')
     plt.grid()
 
     plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
 
+    ax.set_ylim(bottom=0)
+    ax2.set_ylim(bottom=0)
     if large:
         fig.set_size_inches(16, 9)
 

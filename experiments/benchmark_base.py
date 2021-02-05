@@ -43,10 +43,12 @@ def do_experiment(impl, metadeploy, reservation, node, extension, compression, a
             if impl.random_data:
                 runargs += ' -gr'
             final_submit_opts = impl.submit_opts.format(outputloc)+' --conf \'spark.sql.parquet.columnarReaderBatchSize={}\''.format(rb)
-            if not metadeploy.deploy_application(reservation, impl.jar, impl.mainclass, runargs, impl.extra_jars, final_submit_opts, impl.no_results_dir, impl.flamegraph_time):
+            if not metadeploy.deploy_application(reservation, impl.jar, impl.mainclass, runargs, impl.extra_jars, final_submit_opts, impl.no_results_dir):
                 printe('!! Fatal error when trying to deploy application !! ({})'.format(outputloc))
                 status = False
                 break
+            if impl.flamegraph_time != None and not metadeploy.deploy_flamegraph(reservation, impl.flamegraph_time, only_master=impl.flamegraph_only_master, only_worker=impl.flamegraph_only_worker):
+                printw('Could not deploy all flamegraphs')
 
             if metadeploy.block(eu.blockfunc, args=(metadeploy, outputloc, runs_to_perform), sleeptime=impl.appl_sleeptime, dead_after_retries=impl.appl_dead_after_tries):
                 break # We are done!

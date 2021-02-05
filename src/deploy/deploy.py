@@ -29,7 +29,7 @@ def _args_replace(args, timestamp, no_result=False):
 
 
 # Deploy application on a running cluster, with given rerservation
-def _deploy_application_internal(reservation, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flame_graph=False, flame_graph_duration='30s'):
+def _deploy_application_internal(reservation, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
     if not reservation.validate():
         printe('Reservation no longer valid. Cannot deploy application')
         return False
@@ -72,28 +72,16 @@ def _deploy_application_internal(reservation, jarfile, mainclass, args, extra_ja
         fs.join(loc.get_metaspark_jar_dir(), jarfile),
         args)
 
-    if flame_graph:
-        executors = []
-        base_recordpath = fs.join(loc.get_metaspark_recordings_dir(), tm.timestamp('%Y-%m-%d_%H:%M:%S.%f'))
-        fs.mkdir(base_recordpath, exist_ok=False)
-        for host in reservation.deployment.nodes:
-            flame_command = 'ssh {} "python3 {}/main.py deploy flamegraph {} {} -t {} -o {}"'.format(host, fs.abspath(), reservation.deployment.is_master(host), reservation.deployment.get_gid_for_host(host), flame_graph_duration, base_recordpath)
-            executors.append(Executor(flame_command, shell=True))
     print('Executing command: {}'.format(command))
     status = os.system(command) == 0
     if status:
         prints('Deployment was successful!')
     else:
         printe('There were errors during deployment.')
-
-    if flame_graph:
-        Executor.run_all(executors) # Connect to all nodes, start listening for correct pids
-        print('Flamegraph reading set for {}. listening started...'.format(flame_graph_duration))
-        Executor.wait_all(executors, stop_on_error=False)
     return status
 
 
-def _deploy_application(reservation_number, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flame_graph=False, flame_graph_duration='30s'):
+def _deploy_application(reservation_number, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
     if args == None:
         args = ''
     if extra_jars == None:
@@ -109,10 +97,10 @@ def _deploy_application(reservation_number, jarfile, mainclass, args, extra_jars
     except Exception as e:
         printe('Reservation file found, no longer active')
         return False
-    return _deploy_application_internal(reservation, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flame_graph=False, flame_graph_duration='30s')
+    return _deploy_application_internal(reservation, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir)
 
 
-def _deploy_application_remote(jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, flame_graph=False, flame_graph_duration='30s'):
+def _deploy_application_remote(jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
     fs.mkdir(loc.get_metaspark_jar_dir(), exist_ok=True)
     if not fs.isfile(loc.get_metaspark_jar_dir(), jarfile):
         printw('Provided jarfile "{}" not found at "{}"'.format(jarfile, loc.get_metaspark_jar_dir()))
@@ -137,7 +125,6 @@ def _deploy_application_remote(jarfile, mainclass, args, extra_jars, submit_opts
 
     program = '{} {} {} --args \'{}\' --jars \'{}\' --opts \'{}\''.format(reservation_number, jarfile, mainclass, args, extra_jars, submit_opts)
     program += ' --no-resultdir' if no_resultdir else '' 
-    program += ' --flamegraph {}'.format(flame_graph_duration) if flame_graph else ''
     command = 'ssh {} "python3 {}/main.py deploy application {}"'.format(
     metacfg.ssh.ssh_key_name,
     loc.get_remote_metaspark_dir(),
@@ -146,11 +133,11 @@ def _deploy_application_remote(jarfile, mainclass, args, extra_jars, submit_opts
     return os.system(command) == 0
 
 
-def _deploy_data(reservation_number, datalist, deploy_mode, skip, subpath=''):
+def _deploy_data(reservation_or_number, datalist, deploy_mode, skip, subpath=''):
     print('Synchronizing data to local nodes...')
     data = ' '.join(datalist)
     try:
-        reservation = _deploy_data_remote.get(reservation_number)
+        reservation = reservation_manager.get(reservation_or_number) if isinstance(reservation_or_number, int) else reservation_or_number
         if not reservation.validate():
             printe('Reservation no longer valid. Cannot deploy data: {}'.format(', '.join(datalist)))
             return False
@@ -269,7 +256,8 @@ def _deploy_meta_remote(experiments, multiple_at_once):
     return os.system(command) == 0
 
 
-def _flamegraph(is_master, gid, flame_graph_duration, base_recordpath):
+# Flamegraph function executed on node-level. Starts the reading process
+def _flamegraph_node(is_master, gid, flame_graph_duration, base_recordpath):
     designation = 'driver' if is_master else 'worker'
     recordpath = fs.join(base_recordpath, designation+str(gid)+'.jfr')
     pid = None
@@ -286,6 +274,38 @@ def _flamegraph(is_master, gid, flame_graph_duration, base_recordpath):
         printc('Flight recording started, output will be at {}'.format(recordpath), Color.CAN)
     return True
 
+# Coordinates flamegraph listening deployment. Boots flamegraph deployment on all nodes
+def _flamegraph(reservation_or_number, only_master=False, only_worker=False):
+    try:
+        reservation =  reservation_manager.get(reservation_or_number) if isinstance(reservation_or_number, int) reservation_or_number
+        if not reservation.validate():
+            printe('Reservation no longer valid. Cannot deploy data: {}'.format(', '.join(datalist)))
+            return False
+    except FileNotFoundError as e:
+        printe('No reservation found on remote. Cannot run!')
+        return False
+    except Exception as e:
+        printe('Reservation file found, no longer active')
+        return False
+
+    executors = []
+    base_recordpath = fs.join(loc.get_metaspark_recordings_dir(), tm.timestamp('%Y-%m-%d_%H:%M:%S.%f'))
+    fs.mkdir(base_recordpath, exist_ok=False)
+    for host in reservation.deployment.nodes:
+        flame_command = 'ssh {} "python3 {}/main.py deploy flamegraph {} --node -t {} -o {}"'.format(host, fs.abspath(), reservation.deployment.get_gid(host), flame_graph_duration, base_recordpath)
+        if reservation.deployment.is_master(host):
+            if only_worker:
+                continue # We skip master
+            flame_command += ' -m'
+        else:
+            if only_master:
+                continue # We skip workers
+        executors.append(Executor(flame_command, shell=True))
+
+    Executor.run_all(executors) # Connect to all nodes, start listening for correct pids
+    print('Flamegraph reading set for {}. listening started...'.format(flame_graph_duration))
+    return Executor.wait_all(executors, stop_on_error=False)
+
 
 # Register 'deploy' subparser modules
 def subparser(subparsers):
@@ -300,7 +320,6 @@ def subparser(subparsers):
     deployapplparser.add_argument('--jars', nargs='+', metavar='argument', help='Extra jars to pass along your jarfile')
     deployapplparser.add_argument('--opts', nargs='+', metavar='argument', help='Extra arguments to pass on to spark-submit')    
     deployapplparser.add_argument('--no-resultdir', dest='no_resultdir', help='Do not make a resultdirectory in <project root>/results/ for this deployment', action='store_true')
-    deployapplparser.add_argument('--flamegraph', type=str, metavar='time', help='If a time is set here (e.g. 30s, 2m, 1h), measures execution of Spark using a FlightRecording for that time')
     deployapplparser.add_argument('--remote', help='Deploy on remote machine', action='store_true')
 
     deploydataparser = subsubparsers.add_parser('data', help='Deploy data (use deploy data -h to see more...)')
@@ -311,10 +330,11 @@ def subparser(subparsers):
     deploydataparser.add_argument('--remote', help='Connect to remote and execute there', action='store_true')
 
     deployflameparser = subsubparsers.add_parser('flamegraph', help=argparse.SUPPRESS)
-    deployflameparser.add_argument('-m', '--is-master', dest='is_master', help='Whether this node is the driver or not', action='store_true')
     deployflameparser.add_argument('gid', type=int, help='Global id of this node')
+    deployflameparser.add_argument('-m', '--is-master', dest='is_master', help='Whether this node is the driver or not', action='store_true')
     deployflameparser.add_argument('-t', '--time', type=str, metavar='time', default='30s', help='Recording time for flamegraphs, default 30s. Pick s for seconds, m for minutes, h for hours')
     deployflameparser.add_argument('-o', '--outputdir', type=str, metavar='path', help='Record output location. Files will be stored in given absolute directorypath visible after measuring is complete')
+    deployflameparser.add_argument('--node', help=argparse.SUPPRESS, action='store_true')
 
     deploymetaparser = subsubparsers.add_parser('meta', help='Deploy applications with all variations of given parameters')
     deploymetaparser.add_argument('-e', '--experiment', nargs='+', metavar='experiments', help='Experiments to pick')
@@ -345,16 +365,20 @@ def deploy(parsers, args):
         extra_jars = ' '.join(args.jars) if args.jars != None else ''
         submit_opts = ' '.join(args.opts) if args.opts != None else ''
         if args.remote:
-            return _deploy_application_remote(args.reservation, jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir, args.flamegraph!=None, args.flamegraph)
+            return _deploy_application_remote(args.reservation, jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir)
         else:
-            return _deploy_application(args.reservation, jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir, args.flamegraph!=None, args.flamegraph)
+            return _deploy_application(args.reservation, jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir)
     elif args.subcommand == 'data':
         if args.remote:
             return _deploy_data_remote(args.reservation, args.data, args.deploy_mode, args.skip)
         else:
             return _deploy_data(args.reservation, args.data, args.deploy_mode, args.skip)
     elif args.subcommand == 'flamegraph':
-        return _flamegraph(args.is_master, args.gid, args.time, args.outputdir)
+        if args.node:
+            return _flamegraph_node(args.is_master, args.gid, args.time, args.outputdir)
+        else:
+            printe('No direct support implemented for flamegraph spawning. Use experiments!')
+            return False
     elif args.subcommand == 'meta':
         if args.remote:
             _deploy_meta_remote(args.experiment, args.multimeta)

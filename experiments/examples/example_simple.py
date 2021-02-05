@@ -54,9 +54,12 @@ class ExampleExperiment(ExperimentInterface):
             submit_opts = None
             
             print('Starting up a cluster...')
-            state_ok &= metadeploy.cluster_start(self.time_to_reserve, self.config_filename, self.debug_mode, self.fast, self.no_interact)
+            reservation = metadeploy.cluster_start(self.time_to_reserve, self.config_filename, self.debug_mode, self.fast, self.no_interact)
+            if reservation == None:
+                print('Could not start cluster in iteration {}/10'.format(x))
+                continue
             print('Cleaning junk data...')
-            state_ok &= metadeploy.clean_junk()
+            state_ok &= metadeploy.clean_junk(reservation)
             print('Deploying data to allocated nodes...')
 
             # We can copy data collected in <project root>/data/ to local drives of all nodes.
@@ -66,9 +69,9 @@ class ExampleExperiment(ExperimentInterface):
             #       The reason for that is simple: We may have been given new nodes, that do not contain the data yet.
             # 
             # An example call is given below
-            # metadeploy.deploy_data(['MYFILE.txt', 'ADIRPATH/DIR/'], self.skip_if_exists)
+            # metadeploy.deploy_data(reservation, ['MYFILE.txt', 'ADIRPATH/DIR/'], self.skip_if_exists)
             print('Deploying application...')
-            state_ok &= metadeploy.deploy_application(jarfile, mainclass, args, extra_jars, submit_opts, self.no_results_dir)
+            state_ok &= metadeploy.deploy_application(reservation, jarfile, mainclass, args, extra_jars, submit_opts, self.no_results_dir)
             
             print('Blocking until we are done...')
             # We block until the am_i_done_yet function returns MetaDeployState.COMPLETE
@@ -79,7 +82,7 @@ class ExampleExperiment(ExperimentInterface):
             else:
                 print('Terrible news: We failed execution of iteration {}!'.format(x))
                 state_ok = False
-            state_ok &= metadeploy.cluster_stop()
+            state_ok &= metadeploy.cluster_stop(reservation)
             # We stop and reboot the cluster in the loop.
             # If we don't do that, and execution takes > 15:00, then our cluster will be closed by the reservation system. 
             # We cannot  deploy applications/data on dead reservations in following iterations.

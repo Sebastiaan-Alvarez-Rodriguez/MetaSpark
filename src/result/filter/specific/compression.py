@@ -96,14 +96,9 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
 
         ax.set(xlabel=ovar_amount.axis_description+' ($\\times 10^9$)', ylabel='Execution Time [s]', title='Execution Time for {}'.format(who))
 
-        # add a twin axes and set its limits so it matches the first
-        # ax2 = ax.twinx()
-        # ax2.set_ylabel('Relative slowdown of Arrow-Spark')
-        # # ax2.set_ylim((0.7, 1.0))
-        # ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[3]) for x in plot_items], label='Relative speedup of Arrow-Spark')
-        # plt.grid()
-
         plt.legend([bplot0['boxes'][0], bplot1['boxes'][0], bplot2['boxes'][0]], ['uncompressed', 'gzip', 'snappy'], loc='best')
+
+        ax.set_ylim(bottom=0)
 
         if large:
             fig.set_size_inches(16, 9)

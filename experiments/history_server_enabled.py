@@ -92,7 +92,7 @@ class BaseExperiment(ExperimentInterface):
     # This is indeed a seemingly unnecessary step. However, next time we run this function,
     # we can deploy data straight from /local, which should be lots faster than copying from NFS mount again.
     def deploy_data_fast(self, metadeploy, node, extension, amount, kind, rb, partitions_per_node, force_generate=False):
-        command = 'rm -rf {} > /dev/null 2>&1'.format(loc.get_node_raw_ram_dir())
+        command = 'rm -rf {} > /dev/null 2>&1'.format(loc.get_node_ram_dir())
         if not metadeploy.deploy_nonspark_application(command):
             # There were some files that we could not remove, possibly permission issues.
             # Just go on

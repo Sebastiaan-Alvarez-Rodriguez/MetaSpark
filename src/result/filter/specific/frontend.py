@@ -74,18 +74,20 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     # ax2.set_ylim((0.65, 1.00))
     ax2.set_ylabel('Relative speedup of Arrow-Spark')
     ax2.tick_params(axis='y', colors='steelblue')
-    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark', marker='o', color='steelblue')
+    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark', linestyle='', marker='D', markersize=10, color='steelblue')
     plt.grid()
 
-    plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
+    plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='upper left')
 
+    ax.set_ylim(bottom=0)
+    ax2.set_ylim(bottom=0, top=1.7)
     if large:
         fig.set_size_inches(16, 9)
 
     fig.tight_layout()
 
     if store_fig:
-          storer.store(resultdir, 'boxplot_cluster_scalability', filetype, plt)
+          storer.store(resultdir, 'boxplot_frontend', filetype, plt)
 
     if large:
         plt.rcdefaults()

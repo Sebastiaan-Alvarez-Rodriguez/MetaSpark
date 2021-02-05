@@ -98,9 +98,6 @@ def get_node_local_ssd_dir():
     return '/local-ssd/{}/'.format(metacfg.ssh.ssh_user_name)
 
 def get_node_ram_dir():
-    return '{}/{}/'.format(get_node_raw_ram_dir(), metacfg.ssh.ssh_user_name)
-
-def get_node_raw_ram_dir():
     return '/dev/shm/{}/'.format(metacfg.ssh.ssh_user_name)
 
 def get_node_data_dir(deploy_mode):
