@@ -28,7 +28,7 @@ class BenchmarkBase(object):
         # Application deployment params
         self.jar = 'arrow-spark-benchmark-1.0-light.jar'
         self.mainclass = 'org.arrowspark.benchmark.Benchmark'
-        self.args = '{} -np {} -r {} -p {}/ --format {} -nr {} -dm {}  -cl {} -cc {}'
+        self.args = '{} -np {} -r {} -p {}/ --format {} -nr {} -dm {}  -cl {} -nc {} -cc {}'
         self.extra_jars = None
         self.offheap_memory = None #1024*1024*1 # 1 mb of off-heap memory per JVM. Set to None to disable offheap memory
         shared_submit_ops = '-Dio.netty.allocator.directMemoryCacheAlignment=64 -Dfile={0}' # -XX:+FlightRecorder
@@ -95,7 +95,7 @@ class BenchmarkBase(object):
             for x in range(self.retries):
                 partitions = node*partitions_per_node
 
-                runargs = self.args.format(kind, partitions, runs_to_perform, deploypath, extension, self.amount, amount_multiplier, compression, compute_column)
+                runargs = self.args.format(kind, partitions, runs_to_perform, deploypath, extension, self.amount, amount_multiplier, compression, self.num_columns, compute_column)
                 runargs += ' {}'.format(extra_arg)
                 if self.random_data:
                     runargs += ' -gr'
@@ -134,5 +134,5 @@ class BenchmarkBase(object):
                                 for amount_multiplier in self.amount_multipliers:
                                     for kind in self.kinds:
                                         metadeploy.clean_junk(reservation, deploy_mode=self.cluster_deploy_mode)
-                                        do_experiment(self, metadeploy, reservation, node, extension, compression, compute_column, amount_multiplier, kind, rb, partitions_per_node)
+                                        self.do_experiment(metadeploy, reservation, node, extension, compression, compute_column, amount_multiplier, kind, rb, partitions_per_node)
                                 metadeploy.cluster_stop(reservation)

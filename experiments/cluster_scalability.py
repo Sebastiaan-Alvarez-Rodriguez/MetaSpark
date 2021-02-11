@@ -10,23 +10,24 @@ def get_experiment():
     '''Pass your defined experiment class in this function so MetaSpark can find it'''
     return ClusterScalabilityExperiment
 
-class ClusterScalabilityExperiment(ExperimentInterface):
-    '''Data scalability experiment'''
-
-    class BenchmarkClusterScalability(base.BenchmarkBase):
+class BenchmarkClusterScalability(base.BenchmarkBase):
+        '''Class overriding default configurations'''
         def __init__(self):
+            super(BenchmarkClusterScalability, self).__init__()
             # Application deployment params
             self.resultloc = fs.join(fs.abspath(), '..', 'cluster_scalability_res')
 
             # Experiment params
             self.nodes = [4, 8, 16, 32]
 
+class ClusterScalabilityExperiment(ExperimentInterface):
+    '''Cluster scalability experiment'''
 
     # Start experiment with set parameters
     def start(self, metadeploy):
         b = BenchmarkClusterScalability()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(self, metadeploy)
+        b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

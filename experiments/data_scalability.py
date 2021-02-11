@@ -9,23 +9,26 @@ def get_experiment():
     '''Pass your defined experiment class in this function so MetaSpark can find it'''
     return DataScalabilityExperiment
 
+
+class BenchmarkDataScalability(base.BenchmarkBase):
+    '''Class overriding default configurations'''
+    def __init__(self):
+        super(BenchmarkDataScalability, self).__init__()
+        # Application deployment params
+        self.resultloc = fs.join(fs.abspath(), '..', 'data_scalability_res')
+
+        # Experiment params
+        self.amount_multipliers = [4, 8, 16, 32, 64, 128] # makes number of rows this factor larger using symlinks
+
+
 class DataScalabilityExperiment(ExperimentInterface):
     '''Data scalability experiment'''
 
-    class BenchmarkDataScalability(base.BenchmarkBase):
-        def __init__(self):
-            # Application deployment params
-            self.resultloc = fs.join(fs.abspath(), '..', 'data_scalability_res')
-
-            # Experiment params
-            self.amount_multipliers = [4, 8, 16, 32, 64, 128] # makes number of rows this factor larger using symlinks
-
- 
     # Start experiment with set parameters
     def start(self, metadeploy):
         b = BenchmarkDataScalability()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(self, metadeploy)
+        b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

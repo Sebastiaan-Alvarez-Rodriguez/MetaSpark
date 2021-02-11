@@ -10,26 +10,28 @@ def get_experiment():
     '''Pass your defined experiment class in this function so MetaSpark can find it'''
     return FrontendExperiment
 
+class BenchmarkFrontend(base.BenchmarkBase):
+    '''Class overriding default configurations'''
+    def __init__(self):
+        super(BenchmarkFrontend, self).__init__()
+        # Cluster spawning params
+        self.reserve_time = '20:00:00'
+
+        # Application deployment params
+        self.resultloc = fs.join(fs.abspath(), '..', 'frontend_res')
+
+        # Experiment params
+        self.kinds = ['df', 'df_sql', 'ds', 'rdd']
+
+
 class FrontendExperiment(ExperimentInterface):
     '''Data scalability experiment'''
-
-    class BenchmarkFrontend(base.BenchmarkBase):
-        def __init__(self):
-            # Cluster spawning params
-            self.reserve_time = '20:00:00'
-
-            # Application deployment params
-            self.resultloc = fs.join(fs.abspath(), '..', 'frontend_res')
-
-            # Experiment params
-            self.kinds = ['df', 'df_sql', 'ds', 'rdd']
-
 
     # Start experiment with set parameters
     def start(self, metadeploy):
         b = BenchmarkFrontend()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(self, metadeploy)
+        b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

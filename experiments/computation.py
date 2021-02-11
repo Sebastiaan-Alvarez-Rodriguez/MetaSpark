@@ -10,23 +10,26 @@ def get_experiment():
     '''Pass your defined experiment class in this function so MetaSpark can find it'''
     return ComputeExperiment
 
+class BenchmarkComputation(base.BenchmarkBase):
+    '''Class overriding default configurations'''
+    def __init__(self):
+        super(BenchmarkComputation, self).__init__()
+        # Application deployment params
+        self.resultloc = fs.join(fs.abspath(), '..', 'computation_res')
+
+        # Experiment params
+        self.nodes = [4, 8, 16, 32]
+
+
 class ComputeExperiment(ExperimentInterface):
     '''Computation experiment. Uses randomly generated data instead of regular'''
 
-    class BenchmarkComputation(base.BenchmarkBase):
-        def __init__(self):
-            # Application deployment params
-            self.resultloc = fs.join(fs.abspath(), '..', 'computation_res')
-
-            # Experiment params
-            self.nodes = [4, 8, 16, 32]
-
-
+    
     # Start experiment with set parameters
     def start(self, metadeploy):
         b = BenchmarkComputation()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(self, metadeploy)
+        b.iterate_experiments(metadeploy)
 
     def stop(self, metadeploy):
         return True

@@ -10,27 +10,29 @@ def get_experiment():
     '''Pass your defined experiment class in this function so MetaSpark can find it'''
     return RowColumnExperiment
 
+class BenchmarkRowColumn(base.BenchmarkBase):
+    '''Class overriding default configurations'''
+    def __init__(self):
+        super(BenchmarkRowColumn, self).__init__()
+        # Cluster spawning params
+        self.reserve_time = '12:00:00'
+
+        # Application deployment params
+        self.resultloc = fs.join(fs.abspath(), '..', 'row_vs_columnar_res')
+
+        # Experiment params
+        self.amount_multipliers = [4,8,16,32] # makes number of rows this factor larger using symlinks
+        self.extensions = ['pq', 'csv']
+
+
 class RowColumnExperiment(ExperimentInterface):
     '''Row vs column format experiment'''
-
-    class BenchmarkRowColumn(base.BenchmarkBase):
-        def __init__(self):
-            # Cluster spawning params
-            self.reserve_time = '12:00:00'
-
-            # Application deployment params
-            self.resultloc = fs.join(fs.abspath(), '..', 'row_vs_columnar_res')
-
-            # Experiment params
-            self.amount_multipliers = [4,8,16,32] # makes number of rows this factor larger using symlinks
-            self.extensions = ['pq', 'csv']
-
 
     # Start experiment with set parameters
     def start(self, metadeploy):
         b = BenchmarkRowColumn()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(self, metadeploy)
+        b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

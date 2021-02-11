@@ -10,20 +10,22 @@ def get_experiment():
     '''Pass your defined experiment class in this function so MetaSpark can find it'''
     return BufferSizeExperiment
 
+class BenchmarkBuffersize(base.BenchmarkBase):
+    '''Class overriding default configurations'''
+    def __init__(self):
+        super(BenchmarkBuffersize, self).__init__()
+        # Cluster spawning params
+        self.reserve_time = '12:00:00'
+
+        # Application deployment params
+        self.resultloc = fs.join(fs.abspath(), '..', 'buffersize_res')
+
+        # Experiment params
+        self.rbs = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
+
+
 class BufferSizeExperiment(ExperimentInterface):
     '''Buffer size varying experiment.'''
-
-        class BenchmarkBuffersize(base.BenchmarkBase):
-            def __init__(self):
-                # Cluster spawning params
-                self.reserve_time = '12:00:00'
-
-                # Application deployment params
-                self.resultloc = fs.join(fs.abspath(), '..', 'buffersize_res')
-
-                # Experiment params
-                self.rbs = [1024, 2048, 4096, 8192, 16384, 32768]
-
 
     # Start experiment with set parameters
     def start(self, metadeploy):

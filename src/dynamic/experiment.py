@@ -30,15 +30,15 @@ class Experiment(object):
             self._metadeploy.set_idx_amt(index, amount)
             return self.instance.start(self._metadeploy)
         except Exception:
-            print('Registered exception at experimentation runtime, for experiment {}/{}. Cleaning reservations...'.format(index, amount))
-            reservation_manager.stop_selected(self._metadeploy._reservation_numbers)
+            # print('Registered exception at experimentation runtime, for experiment {}/{}. Cleaning reservations...'.format(index+1, amount))
+            # reservation_manager.stop_selected(self._metadeploy._reservation_numbers)
             raise
 
     def stop(self):
         try:
             return self.instance.stop(self._metadeploy)
         except Exception:
-            print('Registered exception at experimentation stoptime, for experiment {}/{}. Cleaning reservations...'.format(index, amount))
+            print('Registered exception at experimentation stoptime, for experiment {}/{}. Cleaning reservations...'.format(index+1, amount))
             raise
         finally:
             reservation_manager.stop_selected(self._metadeploy._reservation_numbers)
