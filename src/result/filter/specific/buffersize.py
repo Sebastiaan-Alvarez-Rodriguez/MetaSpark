@@ -72,7 +72,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     plt.xticks(np.arange(len(plot_items))+1, labels=ticks)
 
 
-    ax.set(xlabel=ovar.axis_description, ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
+    ax.set(xlabel=ovar.axis_description, ylabel='Execution Time [s]')
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()
     # ax2.set_ylim((0.9, 3.5))

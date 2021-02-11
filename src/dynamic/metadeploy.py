@@ -231,7 +231,7 @@ class MetaDeploy(object):
     def deploy_flamegraph(self, reservation_or_number, flame_graph_duration='30s', only_master=False, only_worker=False):
         if flame_graph_duration != None:
             from deploy.deploy import _flamegraph
-            _flamegraph(reservation_or_number, only_master, only_worker)
+            _flamegraph(reservation_or_number, flame_graph_duration, only_master, only_worker)
 
 
     # Print method to print to stderr

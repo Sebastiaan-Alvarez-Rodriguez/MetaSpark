@@ -69,7 +69,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
 
 
     # ax.set(xscale='log', yscale='log', xlabel=ovar.axis_description, ylabel='Execution Time (s)', title='Execution Time with Variance for Arrow-Spark')
-    ax.set(xlabel=ovar.axis_description+' ($\\times 10^9$)', ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
+    ax.set(xlabel=ovar.axis_description+' ($\\times 10^9$)', ylabel='Execution Time [s]')
 
     # add a twin axes and set its limits so it matches the first
     ax2 = ax.twinx()

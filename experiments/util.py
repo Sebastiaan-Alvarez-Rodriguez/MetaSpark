@@ -30,7 +30,10 @@ def blockfunc(metadeploy, outputloc, lines_needed):
 # If the data is not in /local, we deploy data from NFS mount to /local first and then proceed.
 # This is indeed a seemingly unnecessary step. However, next time we run this function,
 # we can deploy data straight from /local, which should be lots faster than copying from NFS mount again.
-def deploy_data_fast(metadeploy, reservation, generate_cmd, node, extension, amount, kind, partitions_per_node, extension_filepath, amounts_multiplier=1):
+def deploy_data_fast(metadeploy, reservation, generate_cmd, dataset_name, node, partitions_per_node, extension, amount, amount_multiplier, num_columns, extension_filepath):
+    if dataset_name == None:
+        dataset_name = ''
+
     clean_cmd = 'rm -rf "{}" > /dev/null 2>&1'.format(loc.get_node_ram_dir())
     if not metadeploy.deploy_nonspark_application(reservation, clean_cmd):
         # There were some files that we could not remove, possibly permission issues. Just go on
@@ -41,19 +44,20 @@ def deploy_data_fast(metadeploy, reservation, generate_cmd, node, extension, amo
         raise RuntimeError('!! Fatal error when trying to deploy data using application (command used: "{}")'.format(generate_cmd))
 
     # make directories on remotes
-    mkdir_cmd = 'mkdir -p "{}"'.format(fs.join(loc.get_node_data_dir(DeployMode.RAM), amount, node*partitions_per_node))
+    mkdir_cmd = 'mkdir -p "{}"'.format(fs.join(loc.get_node_data_dir(DeployMode.RAM), dataset_name, num_columns, amount, node*partitions_per_node))
     if not metadeploy.deploy_nonspark_application(reservation, mkdir_cmd):
         raise RuntimeError('!! Fatal error when trying to mkdir on RAM (command used: "{}")'.format(mkdir_cmd))
-        
 
     # copy data to RAM directory
-    frompath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), amount, node*partitions_per_node, extension_filepath)
-    topath = fs.join(loc.get_node_data_dir(DeployMode.RAM), amount, node*partitions_per_node)
+    frompath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), dataset_name, num_columns, amount, node*partitions_per_node, extension_filepath)
+    topath = fs.join(loc.get_node_data_dir(DeployMode.RAM), dataset_name, num_columns, amount, node*partitions_per_node)
     cp_cmd = 'cp -r "{}" "{}"'.format(frompath, topath)
     if not metadeploy.deploy_nonspark_application(reservation, cp_cmd):
         raise RuntimeError('!! Fatal error when trying to cp data to RAM (command used: "{}")'.format(cp_cmd))
-    if (amounts_multiplier > 1):
-        ln_cmd = 'python3 {}/main.py deploy multiplier -n {} -d "{}" -e {}'.format(fs.abspath(), amounts_multiplier, fs.join(topath, extension_filepath), extension)
+
+    # place hardlinks to inflate data size by given multiplier
+    if (amount_multiplier > 1):
+        ln_cmd = 'python3 {}/main.py deploy multiplier -n {} -d "{}" -e {}'.format(fs.abspath(), amount_multiplier, fs.join(topath, extension_filepath), extension)
         if not metadeploy.deploy_nonspark_application(reservation, ln_cmd):
             raise RuntimeError('!! Fatal error when trying to create symlinks in RAM')
            
