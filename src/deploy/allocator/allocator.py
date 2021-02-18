@@ -87,7 +87,7 @@ class Allocator(object):
     We currently only allocate unallocated experiments.
     Need to check number of pokes a system gets when in allocated state.
     Solution: If the number of pokes exceeds a treshold,
-    we allocate given allocated experiment on a another available cluster.
+    we allocate given allocated experiment on another available cluster.
     Optionally, we can also mark the cluster as non-capable.
     During allocation-time, we would consider non-capable clusters as last alternatives to schedule on
     '''
@@ -111,7 +111,7 @@ class Allocator(object):
         # Sort clusters based on available nodes, most available first
         available_clusters = self.cluster_registry.get_free()
         clusters_sorted = [x for x in sorted(zip(self.get_available_nodes(available_clusters), available_clusters), key=lambda x: x[0], reverse=True)]
-        
+
         allocated = []
         for experiment in self.experiments:
             if x.state != State.UNALLOCATED:

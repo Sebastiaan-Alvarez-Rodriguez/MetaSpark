@@ -19,26 +19,8 @@ class BenchmarkCompression(base.BenchmarkBase):
         self.resultloc = fs.join(fs.abspath(), '..', 'compression_res')
 
         # Experiment params
-        self.nodes = [4, 8, 16, 32]
-
-        # Application deployment params
-        shared_submit_ops = '-Dio.netty.allocator.directMemoryCacheAlignment=64 -Dfile={0} -XX:+FlightRecorder'
-        self.submit_opts = '\
-        --conf \'spark.executor.extraJavaOptions={0}\' \
-        --conf \'spark.driver.extraJavaOptions={0}\' \
-        --conf \'spark.memory.offHeap.size={1}\' \
-        --conf \'spark.memory.offHeap.enabled={2}\' \
-        --driver-memory 60G \
-        --executor-memory 60G'.format(shared_submit_ops, 0 if self.offheap_memory == None else self.offheap_memory, 'false' if self.offheap_memory == None else 'true')
-        self.no_results_dir = True
-        self.flamegraph_time = '3000s'
-        self.flamegraph_only_master = False
-        self.flamegraph_only_worker = True
-
-        # Experiment params
+        self.amount_multipliers = [4, 8, 16, 32]
         self.compressions = ['gzip', 'uncompressed', 'snappy']
-        self.appl_sleeptime = 5 # Sleep X seconds between checks
-        self.appl_dead_after_tries = 120 # If results have not changed between X block checks, we think the application has died
 
 
 class CompressionExperiment(ExperimentInterface):

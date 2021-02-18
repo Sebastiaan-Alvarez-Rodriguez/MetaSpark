@@ -37,7 +37,7 @@ class BenchmarkBase(object):
         # --conf \'spark.locality.wait=0s\' \
         # --conf \'spark.shuffle.reduceLocality.enabled=false\' \
         self.no_results_dir = True
-        self.eventlog_path = None
+        self.eventlog_path = None  # Set this to an existing directory to make Spark history server logs
         self.flamegraph_time = None
         self.flamegraph_only_master = False
         self.flamegraph_only_worker = False
@@ -88,6 +88,9 @@ class BenchmarkBase(object):
         shared_base_opts = '-Dfile={} -Dio.netty.allocator.directMemoryCacheAlignment=64'.format(experiment_outputloc) # -XX:+FlightRecorder
         if self.shared_submit_opts:
             shared_base_opts += ' {}'.format(self.shared_submit_opts)
+        if self.flamegraph_time:
+            shared_base_opts += ' -XX:+FlightRecorder'
+
         opts = '\
         --conf \'spark.executor.extraJavaOptions={0}\' \
         --conf \'spark.driver.extraJavaOptions={0}\' \
