@@ -1,6 +1,6 @@
-import time
-import subprocess
 from enum import Enum
+import subprocess
+import time
 
 from util.executor import Executor
 
@@ -34,7 +34,7 @@ class ExperimentComposition(object):
 
 class ClusterRegistry(object):
     '''Trivial registry object to hold clusters with free-state'''
-    def __init__(self, clusters)
+    def __init__(self, clusters):
         self.clusters = dict()
         for x in clusters:
             self.clusters[x] = True
@@ -51,12 +51,31 @@ class ClusterRegistry(object):
 
 
 class Allocator(object):
-    '''Object to handle allocations and maintain minimal state'''
-     def __init__(self, experiments, clusters, allocator_func, check_time_seconds=120):
+    '''
+    Object to handle allocations and maintain minimal state.
+    Current problem: We check if experiments are done using a poke.
+    The poke only returns clusters with a reservation in R-state.
+    If an experiment is switching clusters, might be it is in PD-state.
+    It might even occur that we poke just when the system switches,
+    so we would see no reservation.
+    In those cases, the system thinks experiment is done, and launches a new one incorrectly.
+
+    Only solution: Poke e.g. 3 times, and only when 3 pokes in a row show no reservation, then
+    we register it as a finished experiment.
+    '''
+    def __init__(self, experiments, clusters, allocator_func, check_time_seconds=120):
         # Sort experiments based on max nodes needed, most needed first
         self.experiments = [ExperimentComposition(x) for x in sorted(experiments, key=lambda x: x.max_nodes_needed(), reverse=True)]
-        self.cluster_registry = ClusterRegistry(clusters)         
-        self.allocated_func = allocator_func
+        self.cluster_registry = ClusterRegistry(clusters)
+        self.cluster_known_capable = ClusterRegistry(clusters)
+        
+        max_available = max(x.total_nodes for x in clusters)
+        if len(self.experiments) > 0 and self.experiments[0].max_nodes_needed() > max_available:
+            max_cluster = sorted(clusters, key=lambda x: x.total_nodes, reverse=True)[0]
+            printe('Can never allocate largest experiment at "{}": Experiment needs more nodes ({}) than we have in any cluster (max {} in cluster {})'.format(experiment.location, experiment.max_nodes_needed(), max_available, max_cluster.ssh_key_name))
+            return False
+
+        self.allocator_func = allocator_func
         self.check_time_seconds = check_time_seconds
 
 
@@ -94,27 +113,26 @@ class Allocator(object):
         return busy_clusters
 
 
+    # Main allocation function. 
     def execute(self):
         while not self.finished():
             if self.num_clusters_available() > 0:
                 allocated = self.allocate()
                 for cluster, experiment in allocated:
-                    self.allocated_func(cluster, experiment)
+                    self.allocator_func(cluster, experiment)
 
             watched_experiments = [idx for idx, x in enumerate(self.experiments) if x.state == State.ALLOCATED or x.state == State.RUNNING]
             indices = self.distributed_poke((self.experiments[idx].cluster for idx in watched_experiments))
             for idx in indices:
                 if self.experiments[idx].state == State.ALLOCATED:
                     self.experiments[idx].state = State.RUNNING
+                    self.cluster_known_capable.mark(self.experiments[idx].cluster, True) # We know this cluster is capable of running
             for idx in set(range(len(self.experiments))) - set(indices):
                 if self.experiments[idx].state == State.RUNNING:
                     self.experiments[idx].state = State.FINISHED
                     self.cluster_registry.mark(self.experiments[idx], now_free=True)
 
-            # If One or more clusters are available again, immediately allocate new experiments
-            if self.num_clusters_available() > 0: 
-                continue
-            # Otherwise, sleep for a bit, until it is time to check again
+            # Sleep for a bit, until it is time to check again
             time.sleep(self.check_time_seconds)
 
 
@@ -126,7 +144,7 @@ class Allocator(object):
         return [x-y for x,y in zip([z.total_nodes for z in clusters], used_nodes)]
 
 
-    def get_available_nodes_for(self, cluster)
+    def get_available_nodes_for(self, cluster):
         command = 'ssh {} "python3 deploy numnodes"'.format(cluster.ssh_key_name)
         used_nodes = subprocess.call(command, shell=True)
         return cluster.total_nodes - used_nodes

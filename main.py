@@ -55,10 +55,11 @@ def export(full_exp=False):
             '.git',
             '__pycache__',
             'data',
-            'results',
             'graphs',
             'jars',
-            'recordings'])
+            'logs',
+            'recordings',
+            'results'])
         if not clean():
             printe('Cleaning failed')
             return False
@@ -67,12 +68,13 @@ def export(full_exp=False):
         command+= ' --exclude '+' --exclude '.join([
             '.git',
             '__pycache__',
-            'data',
-            'results', 
-            'graphs',
             'deps',
+            'data',
+            'graphs',
             'jars',
-            'recordings'])
+            'logs',
+            'recordings',
+            'results'])
     if os.system(command) == 0:
         prints('Export success!')
         return True

@@ -7,8 +7,10 @@ import os
 import socket
 import time
 
+import config.ssh as ssh
 from config.meta import cfg_meta_instance as metacfg
 import das.das as das
+from deploy.allocator.allocator import Allocator
 import deploy.flamegraph as fg
 import dynamic.experiment as exp
 from remote.util.deploymode import DeployMode
@@ -215,7 +217,11 @@ def _deploy_data_multiplier(multiplier, directory, extension):
     return True
 
 
-def _deploy_meta(experiment_names):
+def _deploy_meta(experiment_names, no_hangup):
+    if no_hangup:
+        names = ' '.join(experiment_names) if len(experiment_names) > 0 else ''
+        return os.command('nohup python3 {}/main.py deploy meta -e {} > {}/{}.log &'.format(fs.abspath(), names, loc.get_metaspark_logs_dir(), experiment_names[0]))
+
     if experiment_names == None or len(experiment_names) == 0:
         experiments = exp.get_experiments()
         if len(experiments) == 0:
@@ -240,11 +246,13 @@ def _deploy_meta(experiment_names):
     return True
 
 
-# Returns the number of available nodes on the cluster it is executed on
-def _nodes_used():
-    found = das.nodes_used()
-    print('{} has {} used nodes at this moment'.format(socket.gethostname(), found))
-    return found
+# Deploy experiments, which can do all sorts of things which users would normally have to do manually
+def _deploy_meta_remote(experiments):
+    program = '{}'.format(('-e '+ ' '.join(experiments)) if len(experiments) > 0 else '')
+    command = 'ssh {} "python3 {}/main.py deploy meta {}"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir(), program)
+    print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
+    return os.system(command) == 0
+
 
 def _deploy_multimeta(experiment_names):
     if experiment_names == None or len(experiment_names) == 0:
@@ -259,30 +267,27 @@ def _deploy_multimeta(experiment_names):
 
     experiments_sorted = sorted(experiments, key=lambda x: x.max_nodes_needed(), reverse=True)
 
-    clusters = [''] #TODO: get SSH configs
-    if len(clusters) == 1:
-        printe('We cannot execute multiple experiments in parallel, only 1 SSH config found')
-        return False
+    def allocator_func(cluster, experiment):
+        name = fs.basename(experiment.location)
+        name = name[:-3] if name.endswith('.py') else name
+        print('Allocating experiment "{}" on cluster "{}"'.format(name, cluster.ssh_key_name))
 
-    
-    # If I do a preserve -llist on a cluster, sum the running ones,
-    # I can compute how many resources are currently used.
-    # Using the nodes_total in SSH config, I know how many nodes are free.
-    # With nodes_needed, I know whether it will fit or not
+        program = 'python3 {}/main.py deploy meta --no-hup -e {}'.format(loc.get_remote_metaspark_dir(cluster), name)
+        command = 'ssh {0} "mkdir -p {1} && {2} > {1}/{3}.log"'.format(cluster.ssh_key_name, loc.get_remote_metaspark_logs_dir(), program, name)
+        print('Connecting using key "{}"...'.format(cluster.ssh_key_name))
+        if os.system(command) != 0:
+            printw('Got a non-zero return code for allocating experiment {} on cluster {}'.format(fs.basename(experiment), cluster.ssh_key_name))
 
-    # Problem: I would need to create a daemon-like system. If #experiments > #clusters,
-    # we have to wait for many hours maybe, until an experiment finishes.
-    # Solution: Just use preserve -llist.
-    # If there is any pending or running reservation of me, I can see it using that and wait longer.
-    # Regularly connect (once in configurable, default 5 minutes) to the clusters to see if they are done
+    clusters = ssh.get_configs()
+    alloc = Allocator(experiments, clusters, allocator_func)
+    alloc.execute()
 
-# Deploy experiments, which can do all sorts of things which users would normally have to do manually
-def _deploy_meta_remote(experiments, multiple_at_once):
-    program = '{}'.format(('-e '+ ' '.join(experiments)) if len(experiments) > 0 else '')
-    program += ' -m' if multiple_at_once else ''
-    command = 'ssh {} "python3 {}/main.py deploy meta {}"'.format(metacfg.ssh.ssh_key_name, loc.get_remote_metaspark_dir(), program)
-    print('Connecting using key "{}"...'.format(metacfg.ssh.ssh_key_name))
-    return os.system(command) == 0
+
+# Returns the number of available nodes on the cluster it is executed on
+def _nodes_used():
+    found = das.nodes_used()
+    print('{} has {} used nodes at this moment'.format(socket.gethostname(), found))
+    return found
 
 
 # Flamegraph function executed on node-level. Starts the reading process
@@ -302,6 +307,7 @@ def _flamegraph_node(is_master, gid, flame_graph_duration, base_recordpath):
         fg.launch_flightrecord(pid, recordpath, duration=flame_graph_duration)
         printc('Flight recording started, output will be at {}'.format(recordpath), Color.CAN)
     return True
+
 
 # Coordinates flamegraph listening deployment. Boots flamegraph deployment on all nodes
 def _flamegraph(reservation_or_number, flame_graph_duration, only_master=False, only_worker=False):
@@ -379,6 +385,7 @@ def subparser(subparsers):
     deploymetaparser.add_argument('-e', '--experiment', nargs='+', metavar='experiments', help='Experiments to pick')
     deploymetaparser.add_argument('-m', '--multimeta', help='Whether to process experiments in parallel, in case of multiple experiments', action='store_true')
     deploymetaparser.add_argument('--remote', help='Deploy experiments on remote', action='store_true')
+    deploymetaparser.add_argument('--no-hup', dest='no_hup', help=argparse.SUPPRESS, action='store_true')
 
     deploymultiplierparser = subsubparsers.add_parser('multiplier', help=argparse.SUPPRESS)
     deploymultiplierparser.add_argument('-n', '--number', type=int, metavar='amount', default='10', help='Amount of items to end with after symlinking (1 original item + x symlinks) = this number')
@@ -424,7 +431,7 @@ def deploy(parsers, args):
         elif args.remote:
             _deploy_meta_remote(args.experiment)
         else:
-            _deploy_meta(args.experiment)
+            _deploy_meta(args.experiment, args.no_hup)
     elif args.subcommand == 'multiplier':
         _deploy_data_multiplier(args.number, args.dir, args.extension)
     elif args.subcommand == 'numnodes':

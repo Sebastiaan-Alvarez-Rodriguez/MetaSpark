@@ -31,6 +31,9 @@ def get_metaspark_log4j_conf_dir():
 def get_metaspark_jar_dir():
     return fs.join(fs.abspath(), 'jars')
 
+def get_metaspark_logs_dir():
+    return fs.join(fs.abspath(), 'logs')
+
 def get_metaspark_results_dir():
     return fs.join(fs.abspath(), 'results')
 
@@ -70,20 +73,23 @@ def get_spark_work_dir(deploy_mode):
         raise RuntimeError('Could not find a workdir destination for deploymode: {}'.format(deploy_mode))
 
 #################### Remote directories ####################
-def get_remote_metaspark_parent_dir():
-    return metacfg.ssh.remote_metaspark_dir
+def get_remote_metaspark_parent_dir(sshconfig=None):
+    return metacfg.ssh.remote_metaspark_dir if sshconfig == None else sshconfig.remote_metaspark_dir
 
-def get_remote_metaspark_dir():
-    return fs.join(get_remote_metaspark_parent_dir(), fs.basename(fs.abspath()))
+def get_remote_metaspark_dir(sshconfig=None):
+    return fs.join(get_remote_metaspark_parent_dir(sshconfig), fs.basename(fs.abspath()))
 
 def get_remote_metaspark_conf_dir():
     return fs.join(get_remote_metaspark_dir(), 'conf')
 
+def get_remote_metaspark_data_dir():
+    return fs.join(get_remote_metaspark_dir(), 'data')
+
 def get_remote_metaspark_jar_dir():
     return fs.join(get_remote_metaspark_dir(), 'jars')
 
-def get_remote_metaspark_data_dir():
-    return fs.join(get_remote_metaspark_dir(), 'data')
+def get_remote_metaspark_logs_dir(sshconfig=None):
+    return fs.join(get_remote_metaspark_dir(sshconfig), 'logs')
 
 #################### Node directories ####################
 # Because we will use client logging using plan 2, this should change

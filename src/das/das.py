@@ -4,7 +4,7 @@ import subprocess
 
 
 # Returns True if we have a running reservation
-def have_reservation(user=None)
+def have_reservation(user=None):
     if user == None:
         user = getpass.getuser()
     return len(subprocess.check_output('preserve -llist | awk \'{ print $2,$7}\' | grep \'{} R\''.format(user), shell=True).decode('utf-8').strip()) > 0

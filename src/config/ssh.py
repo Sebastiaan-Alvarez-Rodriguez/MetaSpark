@@ -42,25 +42,27 @@ def gen_config():
     keyname = ask_ssh_key_name()
     sshuser = ask_ssh_user_name()
     remotedir = ask_remote_metaspark_dir()
+    total_nodes = ask_ssh_available_nodes()
     while True:
         configloc = fs.join(get_metaspark_ssh_conf_dir(), fs.basename(ui.ask_string('Please give a name to this configuration')))
         if not configloc.endswith('.cfg'):
             configloc += '.cfg'
         if (not fs.isfile(configloc)) or ui.ask_bool('Config "{}" already exists, override?').format(configloc):
-            write_config(configloc, keyname, sshuser, remotedir)
+            write_config(configloc, keyname, sshuser, remotedir, total_nodes)
             return configloc
         else:
             printw('Pick another configname.')
 
 
 # Persist a configuration file
-def write_config(configloc, key_name, user, metaspark_dir):
+def write_config(configloc, key_name, user, metaspark_dir, total_nodes):
     fs.mkdir(get_metaspark_ssh_conf_dir(), exist_ok=True)
     parser = configparser.ConfigParser()
     parser['SSH'] = {
         'key_name': key_name,
         'user': user,
-        'metaspark_dir': metaspark_dir
+        'metaspark_dir': metaspark_dir,
+        'total_nodes': total_nodes
     }
     with open(configloc, 'w') as file:
         parser.write(file)
@@ -78,17 +80,19 @@ def change_settings():
         chosen = cfg_paths[idx]
 
         settings = SSHConfig(chosen)
-        l = ['key_name', 'user', 'metaspark_dir']
+        l = ['key_name', 'user', 'metaspark_dir', 'total_nodes']
         while True:
             idx = ui.ask_pick('Which setting to change?', l)
-            cur = [settings.ssh_key_name, settings.ssh_user_name, settings.remote_metaspark_dir]
+            cur = [settings.ssh_key_name, settings.ssh_user_name, settings.remote_metaspark_dir, settings.total_nodes]
             print('\nCurrent value: "{}"'.format(cur[idx]))
             if idx == 0:
                 settings.ssh_key_name = ask_ssh_key_name()
             elif idx == 1:
                 settings.ssh_user_name = ask_ssh_user_name()
             elif idx == 2:
-                settings.ask_remote_metaspark_dir = ask_remote_metaspark_dir()
+                settings.remote_metaspark_dir = ask_remote_metaspark_dir()
+            elif idx == 3:
+                settings.total_nodes = ask_ssh_available_nodes()
             settings.persist()
             if ui.ask_bool('Done with this config?'):
                 break
@@ -99,7 +103,7 @@ def change_settings():
 # Check if all required data is present in the config
 def validate_settings(configloc):
     d = dict()
-    d['SSH'] = {'key_name', 'user', 'metaspark_dir'}
+    d['SSH'] = {'key_name', 'user', 'metaspark_dir', 'total_nodes'}
 
     parser = configparser.ConfigParser()
     parser.optionxform=str
@@ -111,6 +115,10 @@ def validate_settings(configloc):
             for subkey in d[key]:
                 if not subkey in parser[key]:
                     raise RuntimeError('Missing key "{}" in section "{}"'.format(subkey, key))
+
+
+def get_configs():
+    return [SSHConfig(x) for x in fs.ls(get_metaspark_ssh_conf_dir(), only_files=True) if x.endswith('.cfg')]
 
 
 class SSHConfig(object):    
@@ -144,6 +152,11 @@ class SSHConfig(object):
     @property
     def remote_metaspark_dir(self):
         return self.parser['SSH']['metaspark_dir']
+
+    # Total number of nodes on remote
+    @property
+    def total_nodes(self):
+        return int(self.parser['SSH']['total_nodes'])
 
     # Path to this config
     @property
