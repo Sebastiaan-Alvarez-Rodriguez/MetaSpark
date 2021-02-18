@@ -1,6 +1,7 @@
 import socket
-import subprocess
+import das.das as das
 import remote.util.ip as ip
+
 class Deployment(object):
     '''Object to contain, save and load node allocations'''
 
@@ -11,7 +12,7 @@ class Deployment(object):
     '''
     def __init__(self, master_port=7077, reservation_number=None, infiniband=True):
         if reservation_number != None:
-            self._raw_nodes = subprocess.check_output("preserve -llist | grep "+str(reservation_number)+" | awk -F'\\t' '{ print $NF }'", shell=True).decode('utf-8').strip().split()
+            self._raw_nodes = das.nodes_for_reservation().split()
             self._raw_nodes.sort(key=lambda x: int(x[4:]))
             self._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in self._raw_nodes] if infiniband else self._raw_nodes
         else:

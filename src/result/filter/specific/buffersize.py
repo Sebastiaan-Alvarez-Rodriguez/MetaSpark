@@ -8,11 +8,11 @@ import util.fs as fs
 import util.location as loc
 
 # Plots execution time with variance (percentiles) as a boxplot, using provided filters
-def stats(resultdir, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_leading):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
-    if Dimension.num_open_vars(node, partitions_per_node, extension, compression, amount, kind, rb) > 1:
-        print('Too many open variables: {}'.format(', '.join([str(x) for x in Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)])))
+    if Dimension.num_open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb) > 1:
+        print('Too many open variables: {}'.format(', '.join([str(x) for x in Dimension.open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)])))
         return
 
     if large:
@@ -25,7 +25,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         plt.rc('font', **font)
     plt.rc('axes', axisbelow=True) 
 
-    ovar = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)[0]
+    ovar = Dimension.open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)[0]
 
     if ovar.name != 'rb':
         print('This plot strategy is only meant for showing varying buffersize-settings')
@@ -35,7 +35,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     fig, ax = plt.subplots()
 
     plot_items = []
-    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, compression, amount, kind, rb):
+    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading, skip_leading):
         if frame_arrow.tag != 'arrow':
             print('Unexpected arrow-tag: '+str(frame_arrow.tag))
             return

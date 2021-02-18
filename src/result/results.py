@@ -57,6 +57,8 @@ def merge(data, skip_initial=True):
 
 
 def _add_filter_args(parser, type_opts):
+    parser.add_argument('-nc', '--num-cols', dest='num_cols', nargs='+', metavar='filter', help='Dataset total column amount filters')
+    parser.add_argument('-cc', '--compute-cols', dest='compute_cols', nargs='+', metavar='filter', help='Dataset used column amount filters')
     parser.add_argument('-n', '--node', nargs='+', metavar='filter', help='Node filters')
     parser.add_argument('-p', '--partition', nargs='+', metavar='filter', help='Partitions-per-node filters')
     parser.add_argument('-e', '--extension', nargs='+', metavar='filter', help='Extension filters')
@@ -64,7 +66,7 @@ def _add_filter_args(parser, type_opts):
     parser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
     parser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
     parser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
-    parser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
+    parser.add_argument('--skip-leading', dest='skip_leading', type=int, default=3, help='Amount of starting experiment results to skip (logical to do due to cold caches), default=3')
     parser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: '+', '.join(type_opts))
 
 def _filterparser(subsubparsers):
@@ -86,8 +88,8 @@ def subparser(subparsers):
     specificparser = _specificparser(subsubparsers)
 
     mergeparser = subsubparsers.add_parser('merge', help='Merge continuation files into main result files')
-    mergeparser.add_argument('--no_skip_initial', dest='skip_initial', help='Skip uncached starting measurements', action='store_false')
-
+    mergeparser.add_argument('--skip-leading', dest='skip_leading', type=int, default=3, help='Amount of starting experiment results to skip (logical to do due to cold caches), default=3')
+    
     resultparser.add_argument('data', help='Location of data', type=str)
     resultparser.add_argument('-l', '--large', help='Forces to generate large graphs, with large text', action='store_true')
     resultparser.add_argument('-ns', '--no-show', dest='no_show', help='Do not show generated graph (useful on servers without xorg forwarding)', action='store_true')
@@ -129,26 +131,26 @@ def results(parsers, args):
 
 
     if args.subcommand == 'filter':
-        fdata = [args.node, args.partition, args.extension, args.compression, args.amount, args.kind, args.readbuffer]
+        fdata = [args.num_cols, args.compute_cols, args.node, args.partition, args.extension, args.compression, args.amount, args.kind, args.readbuffer]
         if args.type == 'barplot':
             import result.filter.barplot as b
-            b.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+            b.stats(args.data, *(fdata+fargs+[args.skip_leading]))
         elif args.type == 'dot':
             import result.filter.dot as d
-            d.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+            d.stats(args.data, *(fdata+fargs+[args.skip_leading]))
         elif args.type == 'generic':
             import result.filter.generic as g
-            g.stats(args.data, *(fdata+[args.skip_initial]))
+            g.stats(args.data, *(fdata+[args.skip_leading]))
         elif args.type == 'line':
             import result.filter.line as l
-            l.stats(args.data, *(fdata+fargs+[args.skip_initial]))    
+            l.stats(args.data, *(fdata+fargs+[args.skip_leading]))    
         elif args.type == 'normal':
             import result.filter.normal as n
-            n.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+            n.stats(args.data, *(fdata+fargs+[args.skip_leading]))
         else:
             filterparser.print_help()
     elif args.subcommand == 'specific':
-        fdata = [args.node, args.partition, args.extension, args.compression, args.amount, args.kind, args.readbuffer]
+        fdata = [args.num_cols, args.compute_cols, args.node, args.partition, args.extension, args.compression, args.amount, args.kind, args.readbuffer]
         if args.type == 'buffersize':
             import result.filter.specific.buffersize as plotter
         elif args.type == 'cluster_scalability':
@@ -159,12 +161,15 @@ def results(parsers, args):
             import result.filter.specific.data_scalability as plotter
         elif args.type == 'frontend':
             import result.filter.specific.frontend as plotter
+        elif args.type == 'projection':
+            import result.filter.specific.projection as plotter
         elif args.type == 'row_vs_columnar':
             import result.filter.specific.row_vs_columnar as plotter
         else:
+            printe('Unreconised provided type "{}"'.format(args.type))
             specificparser.print_help()
             return
-        plotter.stats(args.data, *(fdata+fargs+[args.skip_initial]))
+        plotter.stats(args.data, *(fdata+fargs+[args.skip_leading]))
     elif args.subcommand == 'merge':
         merge(args.data, args.skip_initial)
     else:

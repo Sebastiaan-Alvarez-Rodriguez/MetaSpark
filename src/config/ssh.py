@@ -21,6 +21,9 @@ def ask_ssh_key_name():
 def ask_ssh_user_name():
     return ui.ask_string('What is your username on the remote machine (e.g. "dasuser42")?')
 
+def ask_ssh_available_nodes():
+    return ui.ask_int('How many nodes does this machine have?',minval=1)
+
 def ask_remote_metaspark_dir(default_dir=None):
     q = '''
 In which directory to install metaspark on the remote machine (e.g. /some/path)?
@@ -49,6 +52,7 @@ def gen_config():
         else:
             printw('Pick another configname.')
 
+
 # Persist a configuration file
 def write_config(configloc, key_name, user, metaspark_dir):
     fs.mkdir(get_metaspark_ssh_conf_dir(), exist_ok=True)
@@ -60,6 +64,7 @@ def write_config(configloc, key_name, user, metaspark_dir):
     }
     with open(configloc, 'w') as file:
         parser.write(file)
+
 
 # Change an amount of user settings
 def change_settings():

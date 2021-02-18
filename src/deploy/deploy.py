@@ -6,9 +6,9 @@ import glob
 import os
 import socket
 import time
-import threading
 
 from config.meta import cfg_meta_instance as metacfg
+import das.das as das
 import deploy.flamegraph as fg
 import dynamic.experiment as exp
 from remote.util.deploymode import DeployMode
@@ -215,7 +215,7 @@ def _deploy_data_multiplier(multiplier, directory, extension):
     return True
 
 
-def _deploy_meta(experiment_names, multiple_at_once):
+def _deploy_meta(experiment_names):
     if experiment_names == None or len(experiment_names) == 0:
         experiments = exp.get_experiments()
         if len(experiments) == 0:
@@ -235,18 +235,46 @@ def _deploy_meta(experiment_names, multiple_at_once):
         experiment.stop()
         print('Experiment {} stopped'.format(idx))
 
-    if multiple_at_once:
-        threads = []
-        for idx, x in enumerate(experiments):
-            thread = threading.Thread(target=run_experiment, args=(idx, len(experiments), x))
-            thread.start()
-        for x in threads:
-            thread.join()
-    else:
-        for idx, x in enumerate(experiments):
-            run_experiment(idx, len(experiments), x)
+    for idx, x in enumerate(experiments):
+        run_experiment(idx, len(experiments), x)
     return True
 
+
+# Returns the number of available nodes on the cluster it is executed on
+def _nodes_used():
+    found = das.nodes_used()
+    print('{} has {} used nodes at this moment'.format(socket.gethostname(), found))
+    return found
+
+def _deploy_multimeta(experiment_names):
+    if experiment_names == None or len(experiment_names) == 0:
+        experiments = exp.get_experiments()
+        if len(experiments) == 0:
+            printe('Could not find an experiment to run. Please make an experiment in {}. See the README.md for more info.'.format(loc.get_metaspark_experiments_dir()))
+            return False
+    else:
+        experiments = []
+        for name in experiment_names:
+            experiments.append(exp.load_experiment(name))
+
+    experiments_sorted = sorted(experiments, key=lambda x: x.max_nodes_needed(), reverse=True)
+
+    clusters = [''] #TODO: get SSH configs
+    if len(clusters) == 1:
+        printe('We cannot execute multiple experiments in parallel, only 1 SSH config found')
+        return False
+
+    
+    # If I do a preserve -llist on a cluster, sum the running ones,
+    # I can compute how many resources are currently used.
+    # Using the nodes_total in SSH config, I know how many nodes are free.
+    # With nodes_needed, I know whether it will fit or not
+
+    # Problem: I would need to create a daemon-like system. If #experiments > #clusters,
+    # we have to wait for many hours maybe, until an experiment finishes.
+    # Solution: Just use preserve -llist.
+    # If there is any pending or running reservation of me, I can see it using that and wait longer.
+    # Regularly connect (once in configurable, default 5 minutes) to the clusters to see if they are done
 
 # Deploy experiments, which can do all sorts of things which users would normally have to do manually
 def _deploy_meta_remote(experiments, multiple_at_once):
@@ -344,6 +372,9 @@ def subparser(subparsers):
     deployflameparser.add_argument('-om', '--only-master', dest='only_master', help='Whether we will make a flamegraph for only the master nodes or not', action='store_true')
     deployflameparser.add_argument('-ow', '--only-worker', dest='only_worker', help='Whether we will make a flamegraph for only the worker nodes or not', action='store_true')
 
+    nodesusedparser = subsubparsers.add_parser('numnodes', help='Returns number of used nodes on this machine')
+    checkactiveparser = subsubparsers.add_parser('check_active', help='Returns whether we are active on this machine')
+
     deploymetaparser = subsubparsers.add_parser('meta', help='Deploy applications with all variations of given parameters')
     deploymetaparser.add_argument('-e', '--experiment', nargs='+', metavar='experiments', help='Experiments to pick')
     deploymetaparser.add_argument('-m', '--multimeta', help='Whether to process experiments in parallel, in case of multiple experiments', action='store_true')
@@ -376,6 +407,8 @@ def deploy(parsers, args):
             return _deploy_application_remote(args.reservation, jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir)
         else:
             return _deploy_application(args.reservation, jarfile, mainclass, jargs, extra_jars, submit_opts, args.no_resultdir)
+    elif args.subcommand == 'check_active':
+        return das.have_reservation()
     elif args.subcommand == 'data':
         if args.remote:
             return _deploy_data_remote(args.reservation, args.data, args.deploy_mode, args.skip)
@@ -386,12 +419,16 @@ def deploy(parsers, args):
     elif args.subcommand == 'flamegraph':
         return _flamegraph(args.reservation_number, args.time, only_master=args.only_master, only_worker=args.only_worker)
     elif args.subcommand == 'meta':
-        if args.remote:
-            _deploy_meta_remote(args.experiment, args.multimeta)
+        if args.multimeta:
+            _deploy_multimeta(args.experiment)
+        elif args.remote:
+            _deploy_meta_remote(args.experiment)
         else:
-            _deploy_meta(args.experiment, args.multimeta)
+            _deploy_meta(args.experiment)
     elif args.subcommand == 'multiplier':
         _deploy_data_multiplier(args.number, args.dir, args.extension)
+    elif args.subcommand == 'numnodes':
+        return _nodes_used()
     else:
         deployparser.print_help()
     return True

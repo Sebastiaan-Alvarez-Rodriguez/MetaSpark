@@ -59,8 +59,9 @@ For that, we have the `deploy meta` extension. In this extension, you can run Py
  - deploy data
  - wait until execution completes
  - clean up after experiment completes
+ - despawn clusters
 
-Also, you can write Python3 code to perform your own tasks as well.
+This is done by writing Python3 code to perform these tasks as well.
 Finally, it is possible to perform multiple experiments one after the other, in one command.
 
 For more information about the improved usage, check [experiments/README.md](/experiments/README.md).

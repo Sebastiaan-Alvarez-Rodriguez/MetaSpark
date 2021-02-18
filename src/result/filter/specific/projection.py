@@ -27,8 +27,8 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
 
     ovar = Dimension.open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)[0]
 
-    if ovar.name != 'node':
-        print('This plot strategy is only meant for showing varying node-settings')
+    if ovar.name != 'compute_cols':
+        print('This plot strategy is only meant for showing varying compute_cols-settings')
         return
 
     reader = Reader(path)
@@ -79,7 +79,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
 
     ax.set_ylim(bottom=0)
-    ax2.set_ylim(bottom=0, top=1.6)
+    ax2.set_ylim(bottom=0)
 
     if large:
         fig.set_size_inches(16, 9)

@@ -9,6 +9,7 @@ import util.importer as imp
 import util.location as loc
 import util.ui as ui
 
+from util.printer import *
 
 class Experiment(object):
     '''
@@ -24,14 +25,18 @@ class Experiment(object):
     def metaDeploy(self):
         return self._metadeploy
 
+    @property
+    def max_nodes_needed(self):
+        return self.instance.max_nodes_needed()
+    
 
     def start(self, index, amount):
         try:
             self._metadeploy.set_idx_amt(index, amount)
             return self.instance.start(self._metadeploy)
         except Exception:
-            # print('Registered exception at experimentation runtime, for experiment {}/{}. Cleaning reservations...'.format(index+1, amount))
-            # reservation_manager.stop_selected(self._metadeploy._reservation_numbers)
+            print('Registered exception at experimentation runtime, for experiment {}/{}. Cleaning reservations...'.format(index+1, amount))
+            reservation_manager.stop_selected(self._metadeploy._reservation_numbers)
             raise
 
     def stop(self):

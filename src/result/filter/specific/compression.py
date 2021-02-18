@@ -8,12 +8,12 @@ import util.fs as fs
 import util.location as loc
 
 # Plots execution time with variance (percentiles) as a boxplot, using provided filters
-def stats(resultdir, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_leading):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
-    num_ovars = Dimension.num_open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)
+    num_ovars = Dimension.num_open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)
     if num_ovars > 2 or num_ovars < 2:
-        print('Too {} open variables: Have {} (need open compression and amount)'.format('many' if num_ovars > 2 else 'few', ', '.join([str(x) for x in Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)])))
+        print('Too {} open variables: Have {} (need open compression and amount)'.format('many' if num_ovars > 2 else 'few', ', '.join([str(x) for x in Dimension.open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)])))
         return
 
     if large:
@@ -26,7 +26,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         plt.rc('font', **font)
     plt.rc('axes', axisbelow=True)
 
-    ovars = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)
+    ovars = Dimension.open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)
     has_compression = 'compression' in (x.name for x in ovars)
     has_amount = 'amount' in (x.name for x in ovars)
     if not (has_compression and has_amount):
@@ -37,7 +37,7 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
     reader = Reader(path)
 
     plot_items = []
-    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, compression, amount, kind, rb):
+    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading):
         if frame_arrow.tag != 'arrow':
             print('Unexpected arrow-tag: '+str(frame_arrow.tag))
             return

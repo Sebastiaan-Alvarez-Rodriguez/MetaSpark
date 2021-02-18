@@ -10,11 +10,11 @@ import util.location as loc
 # https://matplotlib.org/3.1.1/gallery/lines_bars_and_markers/bar_stacked.html
 
 # Plots execution time, using provided filters
-def stats(resultdir, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_leading):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
-    if Dimension.num_open_vars(node, partitions_per_node, extension, compression, amount, kind, rb) > 1:
-        print('Too many open variables: {}'.format(', '.join(Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb))))
+    if Dimension.num_open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb) > 1:
+        print('Too many open variables: {}'.format(', '.join(Dimension.open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb))))
         return
 
     if large:
@@ -27,13 +27,13 @@ def stats(resultdir, node, partitions_per_node, extension, compression, amount, 
         }
         plt.rc('font', **font)
 
-    ovar = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)[0]
+    ovar = Dimension.open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)[0]
 
     reader = Reader(path)
     fig, ax = plt.subplots()
 
     plot_items = []
-    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, compression, amount, kind, rb):
+    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading, skip_leading):
         # BAR1loc
         i0 = frame_arrow.i_avgtime
         c0 = frame_arrow.c_avgtime

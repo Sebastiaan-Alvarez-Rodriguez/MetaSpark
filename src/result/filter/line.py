@@ -9,21 +9,21 @@ import util.fs as fs
 import util.location as loc
 
 # Plots execution time, using provided filters
-def stats(resultdir, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_internal):
+def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_leading):
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
     reader = Reader(path)
     plot_arr = []
     label_arr = []
     title_arr = []
-    for frame_arrow, frame_spark in reader.read_ops(node, partitions_per_node, extension, compression, amount, kind, rb):
+    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading, skip_leading):
         # ds_arr = np.add(frame_arrow.c_arr, frame_arrow.i_arr)
         # spark_arr = np.add(frame_spark.c_arr, frame_spark.i_arr)
         arrow_arr = frame_arrow.c_arr
         spark_arr = frame_spark.c_arr
         plot_arr.append((arrow_arr / 1000000000, spark_arr / 1000000000))
 
-        ovars = Dimension.open_vars(node, partitions_per_node, extension, compression, amount, kind, rb)[0]
+        ovars = Dimension.open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)[0]
         label_arr.append(('Arrow-Spark: {}'.format(Dimension.make_id_string(frame_arrow, node, partitions_per_node, extension, compression, amount, kind, rb)),'Spark: {}'.format(Dimension.make_id_string(frame_spark, node, partitions_per_node, extension, compression, amount, kind, rb)),))
         
         title_arr.append('Computation time for {} nodes'.format(frame_arrow.node))

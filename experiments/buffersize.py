@@ -21,7 +21,14 @@ class BenchmarkBuffersize(base.BenchmarkBase):
         self.resultloc = fs.join(fs.abspath(), '..', 'buffersize_res')
 
         # Experiment params
-        self.rbs = [1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, 1048576]
+        self.rbs = [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768, 65536] #131072, 262144, 524288, 1048576
+        # Data deployment params
+        self.num_columns = 100
+
+        # Experiment params
+        self.amount = 30000000 # For this experiment, we generate 20x less rows, to compensate for the x25 columns
+        # self.amount_multipliers = [64] # makes number of rows this factor larger using symlinks
+        self.compute_columns = [64]
 
 
 class BufferSizeExperiment(ExperimentInterface):
@@ -31,8 +38,12 @@ class BufferSizeExperiment(ExperimentInterface):
     def start(self, metadeploy):
         b = BenchmarkBuffersize()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(self, metadeploy)
+        b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):
         return True
+
+
+    def max_nodes_needed(self):
+        return max(self.nodes)

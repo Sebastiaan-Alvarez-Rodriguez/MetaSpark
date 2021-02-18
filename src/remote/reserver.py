@@ -1,8 +1,8 @@
 # This file contains code to make a reservation.
 # Credits and thanks to professor Uta for the Bash scripts we use here!
-import subprocess
 import time
 
+import das.das as das
 from remote.deployment import Deployment
 import util.fs as fs
 import util.location as loc
@@ -36,7 +36,7 @@ class Reservation(object):
     def check_active(reservation_number):
         if reservation_number == None:
             raise RuntimeError('Cannot check if reservation is active without reservation number!')
-        return subprocess.check_output("preserve -llist | grep "+str(reservation_number)+" | awk '{ print $9 }'", shell=True).decode('utf-8').strip().startswith('node')
+        return das.nodes_for_reservation(reservation_number).startswith('node')
 
 
     # Load reservation from disk, if it exists.
@@ -91,9 +91,7 @@ class ReservationManager(object):
 
     # Reserve on DAS5 using given parameters. Blocks until reservation is ready to be used
     def reserve(self, hosts, time_to_reserve, infiniband):
-        reserve_command = 'preserve -np {} -1 -t {}'.format(hosts, time_to_reserve)
-        reserve_command += " | grep \"Reservation number\" | awk '{ print $3 }' | sed 's/://'"
-        number = int(subprocess.check_output(reserve_command, shell=True).decode('utf-8'))
+        number = das.reserve_nodes(hosts, time_to_reserve)
         print('Made reservation {}'.format(number))    
         while not Reservation.check_active(number):
             print('Waiting for reservation...')
@@ -121,7 +119,7 @@ class ReservationManager(object):
             number = item.number
         else:
             raise RuntimeError('I have no idea how to stop a reservation with given param "{}"'.format(item))
-        out = subprocess.call('preserve -c {}'.format(number), shell=True)
+        out = das.reserve_cancel(number)
         retval = out == 0 or out == 33 # Code 33 means "reservation not found". That is just fine, we wanted it gone.
         if not retval:
             printe('Error while stopping cluster with id {} (output was {})'.format(number, out))

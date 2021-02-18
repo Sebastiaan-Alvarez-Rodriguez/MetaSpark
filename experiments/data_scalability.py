@@ -33,3 +33,7 @@ class DataScalabilityExperiment(ExperimentInterface):
 
     def stop(self, metadeploy):
         return True
+
+
+    def max_nodes_needed(self):
+        return max(self.nodes)

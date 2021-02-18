@@ -309,8 +309,11 @@ def main():
             retval = cli_process(args, parser, deployparsers, resultparser)
     else:
         retval = cli_process(args, parser, deployparsers, resultparser)
-    exit(0 if retval else 1)
 
+    if isinstance(retval, bool):
+        exit(0 if retval else 1)
+    else: #retval will be an int
+        exit(retval)
 
 if __name__ == '__main__':
     main()
