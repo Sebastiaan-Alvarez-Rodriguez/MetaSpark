@@ -181,9 +181,9 @@ class MetaDeploy(object):
     retries for trying to deploy the application. If we fail, we first sleep retry_sleep_time before retrying.
     '''
     def deploy_application(self, reservation, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir, retries=5, retry_sleep_time=5):
-        from deploy.deploy import _deploy_application
+        from deploy.application import deploy_application
         for x in range(retries):
-            if _deploy_application(reservation.number, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
+            if deploy_application(reservation.number, jarfile, mainclass, args, extra_jars, submit_opts, no_resultdir):
                 return True
             time.sleep(retry_sleep_time)
         return False
@@ -220,9 +220,9 @@ class MetaDeploy(object):
     def deploy_data(self, reservation_or_number, datalist, deploy_mode, skip, subpath='', retries=5, retry_sleep_time=5):
         dmode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
         dlist = listdatalist if isinstance(datalist, list) else [datalist]
-        from deploy.deploy import _deploy_data
+        from deploy.data import deploy_data
         for x in range(retries):
-            if _deploy_data(reservation_or_number, dlist, dmode, skip, subpath=subpath):
+            if deploy_data(reservation_or_number, dlist, dmode, skip, subpath=subpath):
                 return True
             time.sleep(retry_sleep_time)
         return False
@@ -230,8 +230,8 @@ class MetaDeploy(object):
 
     def deploy_flamegraph(self, reservation_or_number, flame_graph_duration='30s', only_master=False, only_worker=False):
         if flame_graph_duration != None:
-            from deploy.deploy import _flamegraph
-            _flamegraph(reservation_or_number, flame_graph_duration, only_master, only_worker)
+            from deploy.flamegraph import deploy_flamegraph
+            deploy_flamegraph(reservation_or_number, flame_graph_duration, only_master, only_worker)
 
 
     # Print method to print to stderr

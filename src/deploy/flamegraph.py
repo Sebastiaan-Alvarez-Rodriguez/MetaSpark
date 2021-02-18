@@ -35,7 +35,7 @@ def _util_launch_flightrecord(pid, abs_path, duration='30s', delay='0s'):
 
 
 # Flamegraph function executed on node-level. Starts the reading process
-def flamegraph_node(is_master, gid, flame_graph_duration, base_recordpath):
+def deploy_flamegraph_node(is_master, gid, flame_graph_duration, base_recordpath):
     designation = 'driver' if is_master else 'worker'
     recordpath = fs.join(base_recordpath, designation+str(gid)+'.jfr')
     pid = None
@@ -54,7 +54,7 @@ def flamegraph_node(is_master, gid, flame_graph_duration, base_recordpath):
 
 
 # Coordinates flamegraph listening deployment. Boots flamegraph deployment on all nodes
-def flamegraph(reservation_or_number, flame_graph_duration, only_master=False, only_worker=False):
+def deploy_flamegraph(reservation_or_number, flame_graph_duration, only_master=False, only_worker=False):
     from remote.reserver import reservation_manager
     try:
         reservation = reservation_manager.get(reservation_or_number) if isinstance(reservation_or_number, int) else reservation_or_number
@@ -113,6 +113,6 @@ def deploy_args_set(args):
 def deploy(parsers, args):
     deployflamenodeparser, deployflameparser = parsers
     if args.subcommand == 'flamegraph_node':
-        return _flamegraph_node(args.is_master, args.gid, args.time, args.outputdir)
+        return deploy_flamegraph_node(args.is_master, args.gid, args.time, args.outputdir)
     if args.subcommand == 'flamegraph':
-        return _flamegraph(args.reservation_number, args.time, only_master=args.only_master, only_worker=args.only_worker)
+        return deploy_flamegraph(args.reservation_number, args.time, only_master=args.only_master, only_worker=args.only_worker)

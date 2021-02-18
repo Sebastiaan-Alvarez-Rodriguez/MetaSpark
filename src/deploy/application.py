@@ -1,6 +1,7 @@
 import os
 
 from config.meta import cfg_meta_instance as metacfg
+from remote.util.deploymode import DeployMode
 import util.fs as fs
 import util.location as loc
 from util.printer import *
