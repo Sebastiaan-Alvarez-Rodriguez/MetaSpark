@@ -1,4 +1,5 @@
 from experiments.interface import ExperimentInterface
+import experiments.benchmark_base as base
 import experiments.util as eu
 from remote.util.deploymode import DeployMode
 import util.fs as fs
@@ -18,8 +19,8 @@ class BenchmarkDataScalability(base.BenchmarkBase):
         self.resultloc = fs.join(fs.abspath(), '..', 'data_scalability_res')
 
         # Experiment params
-        self.amount_multipliers = [4, 8, 16, 32, 64, 128] # makes number of rows this factor larger using symlinks
-
+        self.amount_multipliers = [4, 8, 16, 32, 64, 128, 256] # makes number of rows this factor larger using symlinks
+        self.appl_dead_after_tries = 28
 
 class DataScalabilityExperiment(ExperimentInterface):
     '''Data scalability experiment'''
@@ -28,7 +29,7 @@ class DataScalabilityExperiment(ExperimentInterface):
     def start(self, metadeploy):
         b = BenchmarkDataScalability()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(metadeploy)
+        return b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

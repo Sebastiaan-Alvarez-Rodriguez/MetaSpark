@@ -27,7 +27,7 @@ class ClusterScalabilityExperiment(ExperimentInterface):
     def start(self, metadeploy):
         b = BenchmarkClusterScalability()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(metadeploy)
+        return b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

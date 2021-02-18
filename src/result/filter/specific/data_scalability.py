@@ -15,10 +15,9 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         return
 
     if large:
-        fontsize = 24
+        fontsize = 28
         font = {
             'family' : 'DejaVu Sans',
-            'weight' : 'bold',
             'size'   : fontsize
         }
         plt.rc('font', **font)
@@ -77,12 +76,12 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark',  marker='D', markersize=10, color='steelblue')
     # ax2.tick_params(axis='y', labelcolor='forestgreen')
     plt.grid()
-    plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='upper left')
+    plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
 
     ax.set_ylim(bottom=0)
-    ax2.set_ylim(bottom=0, top=2.0)
+    ax2.set_ylim(bottom=0, top=25.0)
     if large:
-        fig.set_size_inches(16, 9)
+        fig.set_size_inches(16, 8)
 
     fig.tight_layout()
 

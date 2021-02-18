@@ -46,7 +46,7 @@ class ProjectionExperiment(ExperimentInterface):
     def start(self, metadeploy):
         b = BenchmarkProjection()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(metadeploy)
+        return b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

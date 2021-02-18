@@ -48,7 +48,7 @@ class CompressionExperiment(ExperimentInterface):
     def start(self, metadeploy):
         b = BenchmarkCompression()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(metadeploy)
+        return b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

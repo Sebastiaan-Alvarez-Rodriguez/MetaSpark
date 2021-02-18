@@ -97,7 +97,7 @@ class ReservationManager(object):
             print('Waiting for reservation...')
             time.sleep(1)
         prints('Reservation ready!')
-        r = Reservation(number,  Deployment(reservation_number=number, infiniband=infiniband))
+        r = Reservation(number, Deployment(reservation_number=number, infiniband=infiniband))
         r.persist()
         with self.lock:
             self.reservations[number] = r

@@ -16,10 +16,9 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         return
 
     if large:
-        fontsize = 24
+        fontsize = 28
         font = {
             'family' : 'DejaVu Sans',
-            'weight' : 'bold',
             'size'   : fontsize
         }
         plt.rc('font', **font)
@@ -46,10 +45,12 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
             print('Warning: comparing different sizes')
         # Box0
         x0 = getattr(frame_arrow, ovar.name)
-        data0 = np.add(frame_arrow.i_arr, frame_arrow.c_arr) / 10**9
+        # data0 = np.add(frame_arrow.i_arr, frame_arrow.c_arr) / 10**9
+        data0 = frame_arrow.c_arr / 10**9
         # Box1
         x1 = getattr(frame_spark, ovar.name)
-        data1 = np.add(frame_spark.i_arr, frame_spark.c_arr) / 10**9
+        # data1 = np.add(frame_spark.i_arr, frame_spark.c_arr) / 10**9
+        data1 = frame_spark.c_arr / 10**9
         plot_items.append((x0, data0, data1,))
 
     if len(plot_items) == 0:
@@ -79,10 +80,10 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
 
     ax.set_ylim(bottom=0)
-    ax2.set_ylim(bottom=0, top=1.6)
+    ax2.set_ylim(bottom=0)
 
     if large:
-        fig.set_size_inches(16, 9)
+        fig.set_size_inches(16, 8)
 
     fig.tight_layout()
 

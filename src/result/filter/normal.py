@@ -16,10 +16,9 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     reader = Reader(path)
     for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading, skip_leading):
         if large:
-            fontsize = 24
+            fontsize = 28
             font = {
                 'family' : 'DejaVu Sans',
-                'weight' : 'bold',
                 'size'   : fontsize
             }
             plt.rc('font', **font)
@@ -40,7 +39,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         ax[1].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Spark')
         
         if large:
-            fig.set_size_inches(12, 9)
+            fig.set_size_inches(16, 8)
 
         fig.tight_layout()
 

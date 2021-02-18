@@ -18,7 +18,7 @@ def nodes_used():
 
 # Returns string of nodes reserved for given reservation number
 def nodes_for_reservation(reservation_number):
-    return subprocess.check_output('preserve -llist | grep '+str(reservation_number)+' | awk \'{ print $9 }\'', shell=True).decode('utf-8').strip()
+    return subprocess.check_output('preserve -llist | grep '+str(reservation_number)+' | awk -F\'\\t\' \'{ print $NF }\'', shell=True).decode('utf-8').strip()
 
 
 # Places reservation on DAS with num_nodes for given time.
@@ -35,4 +35,4 @@ def reserve_nodes(num_nodes, time_to_reserve):
 # Note: Exit code 0 means success (of course).
 #       Exit code 33 means that the reservation number was not found.
 def reserve_cancel(reservation_number):
-    return subprocess.call('preserve -c {}'.format(number), shell=True)
+    return subprocess.call('preserve -c {}'.format(reservation_number), shell=True)

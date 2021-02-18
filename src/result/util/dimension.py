@@ -63,7 +63,7 @@ class Dimension(object):
         if name == 'num_cols':
             return 'Total columns'
         if name == 'compute_cols':
-            return 'Used columns'
+            return 'Selectivity [%% columns]'
         if name == 'node':
             return 'Executor cluster size (nodes)'
         if name == 'partitions_per_node':

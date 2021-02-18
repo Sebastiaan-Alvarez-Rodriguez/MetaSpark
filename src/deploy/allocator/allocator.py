@@ -33,42 +33,69 @@ class ExperimentComposition(object):
 
 
 class ClusterRegistry(object):
-    '''Trivial registry object to hold clusters with free-state'''
+    '''
+    Trivial registry object to hold clusters with state.
+    Each cluster has:
+    1. 'free' state. Tells if an experiment is allocated/running on a cluster.
+    2. 'capable' state. Tells if we had to wait for too long for an allocated experiment to run.
+    3. 'pokes' state. Gives the number of subsequent pokes that showed either
+        1. no experiment is allocated/running anymore (when belonging experiment state is RUNNING)
+        2. allocated experiment is not running yet (when belongin experiment state is ALLOCATED)
+    '''
     def __init__(self, clusters):
-        self.clusters = dict()
+        self.free = dict()
+        self.capable = dict()
+        self.pokes = dict()
         for x in clusters:
-            self.clusters[x] = True
+            self.free[x] = True
+            self.capable[x] = True
+            self.pokes[x] = 0
 
     def get_free():
-        return (key for key, value in self.clusters if value)
+        return (key for key, value in self.free if value)
 
     def get_allocated():
-        return (key for key, value in self.clusters if not value)
+        return (key for key, value in self.free if not value)
 
-    def mark(cluster, now_free):
-        assert cluster in self.clusters
-        self.clusters[cluster] = now_free
+    def mark_free(cluster, now_free):
+        assert cluster in self.free
+        self.free[cluster] = now_free
+
+    def mark_capable(cluster, now_capable):
+        assert cluster in self.capable
+        self.capable[cluster] = now_capable
+
+    def is_capable(cluster):
+        assert cluster in self.capable
+        return self.capable[cluster]
+
+    def mark_poke(cluster):
+        assert cluster in self.pokes
+        self.pokes[cluster] = self.pokes[cluster]+1
+        return self.pokes[cluster]
+
+    def reset_poke(cluster):
+        assert cluster in self.pokes
+        self.pokes[cluster] = 0
 
 
 class Allocator(object):
     '''
     Object to handle allocations and maintain minimal state.
-    Current problem: We check if experiments are done using a poke.
-    The poke only returns clusters with a reservation in R-state.
-    If an experiment is switching clusters, might be it is in PD-state.
-    It might even occur that we poke just when the system switches,
-    so we would see no reservation.
-    In those cases, the system thinks experiment is done, and launches a new one incorrectly.
-
-    Only solution: Poke e.g. 3 times, and only when 3 pokes in a row show no reservation, then
-    we register it as a finished experiment.
+    Current problem: Suppose we have an experiment that is just done, and an experiment scheduled
+    somewhere where it will not run for another week.
+    We currently only allocate unallocated experiments.
+    Need to check number of pokes a system gets when in allocated state.
+    Solution: If the number of pokes exceeds a treshold,
+    we allocate given allocated experiment on a another available cluster.
+    Optionally, we can also mark the cluster as non-capable.
+    During allocation-time, we would consider non-capable clusters as last alternatives to schedule on
     '''
-    def __init__(self, experiments, clusters, allocator_func, check_time_seconds=120):
+    def __init__(self, experiments, clusters, allocator_func, check_time_seconds=120, num_pokes_to_finish=3, num_pokes_to_allocate=30):
         # Sort experiments based on max nodes needed, most needed first
         self.experiments = [ExperimentComposition(x) for x in sorted(experiments, key=lambda x: x.max_nodes_needed(), reverse=True)]
         self.cluster_registry = ClusterRegistry(clusters)
-        self.cluster_known_capable = ClusterRegistry(clusters)
-        
+
         max_available = max(x.total_nodes for x in clusters)
         if len(self.experiments) > 0 and self.experiments[0].max_nodes_needed() > max_available:
             max_cluster = sorted(clusters, key=lambda x: x.total_nodes, reverse=True)[0]
@@ -77,6 +104,7 @@ class Allocator(object):
 
         self.allocator_func = allocator_func
         self.check_time_seconds = check_time_seconds
+        self.num_pokes_to_finish = num_pokes_to_finish
 
 
     def allocate(self):
@@ -116,21 +144,34 @@ class Allocator(object):
     # Main allocation function. 
     def execute(self):
         while not self.finished():
-            if self.num_clusters_available() > 0:
+            if self.num_clusters_available() > 0 and len(x for x in self.experiments if x.state == State.UNALLOCATED or (x.state == State.ALLOCATED and not self.cluster_registry.is_capable(x.cluster))) > 0:
                 allocated = self.allocate()
                 for cluster, experiment in allocated:
                     self.allocator_func(cluster, experiment)
 
             watched_experiments = [idx for idx, x in enumerate(self.experiments) if x.state == State.ALLOCATED or x.state == State.RUNNING]
             indices = self.distributed_poke((self.experiments[idx].cluster for idx in watched_experiments))
+
+            # Mark found running experiments/clusters
             for idx in indices:
+                self.cluster_registry.reset_poke(self.experiments[idx].cluster)
                 if self.experiments[idx].state == State.ALLOCATED:
                     self.experiments[idx].state = State.RUNNING
-                    self.cluster_known_capable.mark(self.experiments[idx].cluster, True) # We know this cluster is capable of running
+
+            # Mark not-running experiments/clusters
             for idx in set(range(len(self.experiments))) - set(indices):
+                if self.experiments[idx].state == State.ALLOCATED:
+                    # Found that experiment is not running yet. Increase poke state
+                    poked = self.cluster_registry.mark_poke(self.experiments[idx].cluster)
+                    if poked >= self.num_pokes_to_allocate:
+                        self.cluster_registry.mark_capable(self.experiments[idx].cluster, now_capable=False)
+
                 if self.experiments[idx].state == State.RUNNING:
-                    self.experiments[idx].state = State.FINISHED
-                    self.cluster_registry.mark(self.experiments[idx], now_free=True)
+                    # No longer running experiment found
+                    poked = self.cluster_registry.mark_poke(self.experiments[idx].cluster)
+                    if poked >= self.num_pokes_to_finish:
+                        self.experiments[idx].state = State.FINISHED
+                        self.cluster_registry.mark_free(self.experiments[idx].cluster, now_free=True)
 
             # Sleep for a bit, until it is time to check again
             time.sleep(self.check_time_seconds)

@@ -32,7 +32,7 @@ class RowColumnExperiment(ExperimentInterface):
     def start(self, metadeploy):
         b = BenchmarkRowColumn()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(metadeploy)
+        return b.iterate_experiments(metadeploy)
 
 
     def stop(self, metadeploy):

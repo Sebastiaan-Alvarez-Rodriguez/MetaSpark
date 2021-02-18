@@ -151,8 +151,8 @@ def _start_cluster(time_to_reserve, config_filename):
         nodes = cluster_cfg.coallocation_affinity * cluster_cfg.nodes+1
         printw('''
 Warning! Configuration specifies "{}" workers per node, {} nodes.
-MetaSpark version RESERVE can only spawn 1 process per node,
-due to some annoying things in Spark 3.0+.
+MetaSpark version RESERVE can only spawn 1 Spark process per node,
+due to some annoying things in Spark.
 Spawning {} nodes instead to service your request!
 '''.format(cluster_cfg.coallocation_affinity, cluster_cfg.nodes, nodes-1))
 

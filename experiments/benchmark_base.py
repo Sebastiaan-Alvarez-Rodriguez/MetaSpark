@@ -150,6 +150,7 @@ class BenchmarkBase(object):
 
 
     def iterate_experiments(self, metadeploy):
+        status = True
         for partitions_per_node in self.partitions_per_nodes:
             for rb in self.rbs:
                 for extension in self.extensions:
@@ -164,5 +165,6 @@ class BenchmarkBase(object):
                                 for amount_multiplier in self.amount_multipliers:
                                     for kind in self.kinds:
                                         metadeploy.clean_junk(reservation, deploy_mode=self.cluster_deploy_mode)
-                                        self.do_experiment(metadeploy, reservation, compute_column, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node)
+                                        status &= self.do_experiment(metadeploy, reservation, compute_column, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node)
                                 metadeploy.cluster_stop(reservation)
+        return status

@@ -19,10 +19,9 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
 
     if large:
         print('Going large!')
-        fontsize = 24
+        fontsize = 28
         font = {
             'family' : 'DejaVu Sans',
-            'weight' : 'bold',
             'size'   : fontsize
         }
         plt.rc('font', **font)
@@ -76,7 +75,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         plt.legend(loc='best', frameon=False)
 
     if large:
-        fig.set_size_inches(12, 9)
+        fig.set_size_inches(16, 8)
 
     fig.tight_layout()
 

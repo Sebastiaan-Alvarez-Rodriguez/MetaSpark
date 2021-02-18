@@ -15,10 +15,9 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         return
 
     if large:
-        fontsize = 24
+        fontsize = 28
         font = {
             'family' : 'DejaVu Sans',
-            'weight' : 'bold',
             'size'   : fontsize
         }
         plt.rc('font', **font)
@@ -84,7 +83,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     ax.set_ylim(bottom=0)
     ax2.set_ylim(bottom=0)
     if large:
-        fig.set_size_inches(16, 9)
+        fig.set_size_inches(16, 8)
 
     fig.tight_layout()
 

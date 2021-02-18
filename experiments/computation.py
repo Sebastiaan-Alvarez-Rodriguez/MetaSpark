@@ -29,7 +29,7 @@ class ComputeExperiment(ExperimentInterface):
     def start(self, metadeploy):
         b = BenchmarkComputation()
         metadeploy.eprint('Ready to deploy!')
-        b.iterate_experiments(metadeploy)
+        return b.iterate_experiments(metadeploy)
 
     def stop(self, metadeploy):
         return True

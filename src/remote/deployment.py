@@ -12,7 +12,8 @@ class Deployment(object):
     '''
     def __init__(self, master_port=7077, reservation_number=None, infiniband=True):
         if reservation_number != None:
-            self._raw_nodes = das.nodes_for_reservation().split()
+            self._raw_nodes = das.nodes_for_reservation(reservation_number).split()
+            print('Deployment: Raw Node test: {}'.format(self._raw_nodes))
             self._raw_nodes.sort(key=lambda x: int(x[4:]))
             self._nodes = [ip.node_to_infiniband_ip(int(x[4:])) for x in self._raw_nodes] if infiniband else self._raw_nodes
         else:
