@@ -21,7 +21,7 @@ class BenchmarkRowColumn(base.BenchmarkBase):
         self.resultloc = fs.join(fs.abspath(), '..', 'row_vs_columnar_res')
 
         # Experiment params
-        self.amount_multipliers = [4,8,16,32] # makes number of rows this factor larger using symlinks
+        self.amount_multipliers = [4, 8, 16, 32, 64] # makes number of rows this factor larger using symlinks
         self.extensions = ['pq', 'csv']
 
 

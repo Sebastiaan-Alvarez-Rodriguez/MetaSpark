@@ -233,7 +233,7 @@ def cli_process(args, parser, deployparsers, resultparser):
     elif args.command == 'check':
         retval = check()
     elif args.command == 'export':
-        retval = export(full_exp=True)
+        retval = export(full_exp=False)
     elif args.command == 'init' and args.internal:
         retval = _init_internal()
     elif args.command == 'init':

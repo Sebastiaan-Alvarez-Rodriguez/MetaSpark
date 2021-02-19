@@ -99,16 +99,16 @@ def deploy_data_multiplier(multiplier, directory, extension):
 # Register 'deploy' subparser modules
 def subparser(subsubparsers):
     deploydataparser = subsubparsers.add_parser('data', help='Deploy data (use deploy data -h to see more...)')
-    deploydataparser.add_argument('reservation', help='Reservation number of cluster to deploy on', type=int)
-    deploydataparser.add_argument('data', nargs='+', metavar='file', help='Files to place on reserved nodes local drive')
-    deploydataparser.add_argument('-dm', '--deploy-mode', type=str, metavar='mode', default=str(DeployMode.STANDARD), help='Deployment mode for data', choices=[str(x) for x in DeployMode])
-    deploydataparser.add_argument('--skip', help='Skip data if already found on nodes', action='store_true')
-    deploydataparser.add_argument('--remote', help='Connect to remote and execute there', action='store_true')
+    deploydataparser.add_argument('reservation', help='Reservation number of cluster to deploy on.', type=int)
+    deploydataparser.add_argument('data', nargs='+', metavar='file', help='Files to place on reserved nodes local drive.')
+    deploydataparser.add_argument('-dm', '--deploy-mode', type=str, metavar='mode', default=str(DeployMode.STANDARD), help='Deployment mode for data.', choices=[str(x) for x in DeployMode])
+    deploydataparser.add_argument('--skip', help='Skip data if already found on nodes.', action='store_true')
+    deploydataparser.add_argument('--remote', help='Indicates we are not currently on DAS. Deploy experiments on remote over SSH.', action='store_true')
 
-    deploymultiplierparser = subsubparsers.add_parser('multiplier', help=argparse.SUPPRESS)
-    deploymultiplierparser.add_argument('-n', '--number', type=int, metavar='amount', default='10', help='Amount of items to end with after symlinking (1 original item + x symlinks) = this number')
-    deploymultiplierparser.add_argument('-d', '--dir', type=str, metavar='path', help='Dir to perform file multiplication')
-    deploymultiplierparser.add_argument('-e', '--extension', type=str, metavar='extension', help='Extension of files in dir')
+    deploymultiplierparser = subsubparsers.add_parser('multiplier', help='Data-utility to increase data size virtually, by applying hardlinks.')
+    deploymultiplierparser.add_argument('-n', '--number', type=int, metavar='amount', default='10', help='Data multiplier to apply.')
+    deploymultiplierparser.add_argument('-d', '--dir', type=str, metavar='path', help='Dir to perform file multiplication.')
+    deploymultiplierparser.add_argument('-e', '--extension', type=str, metavar='extension', help='Extension of files in dir.')
     return deploydataparser, deploymultiplierparser
 
 # Return True if we found arguments used from this subsubparser, False otherwise

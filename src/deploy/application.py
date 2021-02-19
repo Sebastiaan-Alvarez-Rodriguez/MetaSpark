@@ -123,14 +123,14 @@ def deploy_application_remote(jarfile, mainclass, args, extra_jars, submit_opts,
 # Register 'deploy' subparser modules
 def subparser(subsubparsers):
     deployapplparser = subsubparsers.add_parser('application', help='Deploy applications (use deploy start -h to see more...)')
-    deployapplparser.add_argument('reservation', help='Reservation number of cluster to deploy on', type=int)
-    deployapplparser.add_argument('jarfile', help='Jarfile to deploy')
-    deployapplparser.add_argument('mainclass', help='Main class of jarfile')
-    deployapplparser.add_argument('--args', nargs='+', metavar='argument', help='Arguments to pass on to your jarfile')
-    deployapplparser.add_argument('--jars', nargs='+', metavar='argument', help='Extra jars to pass along your jarfile')
-    deployapplparser.add_argument('--opts', nargs='+', metavar='argument', help='Extra arguments to pass on to spark-submit')    
-    deployapplparser.add_argument('--no-resultdir', dest='no_resultdir', help='Do not make a resultdirectory in <project root>/results/ for this deployment', action='store_true')
-    deployapplparser.add_argument('--remote', help='Deploy on remote machine', action='store_true')
+    deployapplparser.add_argument('reservation', help='Reservation number of cluster to deploy on.', type=int)
+    deployapplparser.add_argument('jarfile', help='Jarfile to deploy.')
+    deployapplparser.add_argument('mainclass', help='Main class of jarfile.')
+    deployapplparser.add_argument('--args', nargs='+', metavar='argument', help='Arguments to pass on to your jarfile.')
+    deployapplparser.add_argument('--jars', nargs='+', metavar='argument', help='Extra jars to pass along your jarfile.')
+    deployapplparser.add_argument('--opts', nargs='+', metavar='argument', help='Extra arguments to pass on to spark-submit.')    
+    deployapplparser.add_argument('--no-resultdir', dest='no_resultdir', help='Do not make a resultdirectory in <project root>/results/ for this deployment.', action='store_true')
+    deployapplparser.add_argument('--remote', help='Deploy on remote machine.', action='store_true')
     return deployapplparser
 
 # Return True if we found arguments used from this subsubparser, False otherwise

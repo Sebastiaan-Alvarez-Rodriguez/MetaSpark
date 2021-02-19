@@ -58,7 +58,7 @@ class BenchmarkBase(object):
         self.runs = 31 # We run our selfementation and the Spark baseline selfementation X times
         self.retries = 2 # If our application dies X times, we stop trying and move on
         self.appl_sleeptime = 30 # Sleep X seconds between checks
-        self.appl_dead_after_tries = 14 # If results have not changed between X block checks, we think the application has died
+        self.appl_dead_after_tries = 20 # If results have not changed between X block checks, we think the application has died
 
 
     def distribute_data(self, metadeploy, reservation, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node):
@@ -81,8 +81,8 @@ class BenchmarkBase(object):
         generate_cmd = '$JAVA_HOME/bin/java -jar ~/{} {} > /dev/null 2>&1'.format(self.data_jar, data_runargs)
         if not eu.deploy_data_fast(metadeploy, reservation, generate_cmd, self.dataset_name, node, partitions_per_node, extension, self.amount, amount_multiplier, self.num_columns, extension_filepath):
             raise RuntimeError('Data deployment failure')
-        return deploypath
-
+        return fs.join(loc.get_node_data_dir(DeployMode.RAM), self.dataset_name, self.num_columns) if self.dataset_name else fs.join(loc.get_node_data_dir(DeployMode.RAM), self.num_columns)
+        
 
     def finalize_submitopts(self, experiment_outputloc, experiment_rb):
         shared_base_opts = '-Dfile={} -Dio.netty.allocator.directMemoryCacheAlignment=64'.format(experiment_outputloc) # -XX:+FlightRecorder

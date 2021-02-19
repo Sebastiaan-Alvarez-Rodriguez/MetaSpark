@@ -19,7 +19,7 @@ class BenchmarkDataScalability(base.BenchmarkBase):
         self.resultloc = fs.join(fs.abspath(), '..', 'data_scalability_res')
 
         # Experiment params
-        self.amount_multipliers = [4, 8, 16, 32, 64, 128, 256] # makes number of rows this factor larger using symlinks
+        self.amount_multipliers = [4, 8, 16, 32, 64] # makes number of rows this factor larger using symlinks
         self.appl_dead_after_tries = 28
 
 class DataScalabilityExperiment(ExperimentInterface):

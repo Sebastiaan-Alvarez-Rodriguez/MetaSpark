@@ -45,7 +45,7 @@ def deploy_meta_remote(experiments):
 def subparser(subsubparsers):
     deploymetaparser = subsubparsers.add_parser('meta', help='Deploy applications using experiments.')
     deploymetaparser.add_argument('-e', '--experiment', nargs='+', metavar='experiments', help='Experiments to deploy.')
-    deploymetaparser.add_argument('--remote', help='Deploy experiments on remote', action='store_true')
+    deploymetaparser.add_argument('--remote', help='Indicates we are not currently on DAS. Deploy experiments on remote over SSH.', action='store_true')
     return deploymetaparser
 
 

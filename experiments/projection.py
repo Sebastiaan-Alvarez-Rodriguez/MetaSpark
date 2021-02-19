@@ -21,22 +21,13 @@ class BenchmarkProjection(base.BenchmarkBase):
         # self.flamegraph_only_master = False
         # self.flamegraph_only_worker = False
         self.eventlog_path = '/home/salvarez/spark-persist'
-        # self.submit_opts = ' \
-        #     --conf \'spark.sql.shuffle.partitions={}\''.format(8*16*4)
-        # --conf \'spark.sql.sources.ignoreDataLocality.enabled=true\''
-        # '--conf \'spark.locality.wait=0\' \
-        #  --conf \'spark.locality.wait.process=0\''
-
 
         # Data deployment params
         self.num_columns = 100
 
         # Experiment params
         self.amount = 30000000 # For this experiment, we generate 20x less rows, to compensate for the x25 columns
-        self.amount_multipliers = [64]
-        # self.nodes = [16]
         self.compute_columns = [10, 20, 50, 100]
-        # self.test_modes = ['--arrow-only']
 
 
 class ProjectionExperiment(ExperimentInterface):

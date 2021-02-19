@@ -19,7 +19,7 @@ class BenchmarkCompression(base.BenchmarkBase):
         self.resultloc = fs.join(fs.abspath(), '..', 'compression_res')
 
         # Experiment params
-        self.amount_multipliers = [4, 8, 16, 32]
+        self.amount_multipliers = [4, 8, 16, 32, 64]
         self.compressions = ['gzip', 'uncompressed', 'snappy']
 
 

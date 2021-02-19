@@ -48,11 +48,11 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         # Box0
         amount0 = getattr(frame_arrow, ovar_amount.name) / 10**9
         comp0 = getattr(frame_arrow, ovar_compression.name)
-        data0 = np.add(frame_arrow.i_arr, frame_arrow.c_arr) / 10**9
+        data0 = frame_arrow.c_arr / 10**9
         # Box1
         amount1 = getattr(frame_spark, ovar_amount.name) / 10**9
         comp1 = getattr(frame_arrow, ovar_compression.name)
-        data1 = np.add(frame_spark.i_arr, frame_spark.c_arr) / 10**9
+        data1 = frame_spark.c_arr / 10**9
         if amount0 != amount1:
             print('Unexpected amount-identifier mismatch!')
             return
@@ -70,19 +70,20 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     for idx, who in enumerate(['Arrow-Spark', 'Default Spark']):
         fig, ax = plt.subplots()
         # print('Have {} items. Should be paired in threes (uncompressed, snappy, gzip). Gives {} pairs.'.format(len(plot_items), len(plot_items)//3))
+        num_pairs = len(plot_items) // 3
         plot_items_arranged = ((plot_items[x*3], plot_items[x*3+1], plot_items[x*3+2]) for x in range(len(plot_items)//3))
 
         # Plot the left boxes, the uncompressed ones
-        bplot0 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='uncompressed'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1-0.3) #positions=np.arange(len(plot_items))+1-0.15
+        bplot0 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='uncompressed'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(num_pairs)+1-0.3) #positions=np.arange(len(plot_items))+1-0.15
         plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
         plt.setp(bplot0['medians'], color='midnightblue')
 
         # Plot the middle boxes, the gzip ones
-        bplot1 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='gzip'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1) #positions=np.arange(len(plot_items))+1-0.15
+        bplot1 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='gzip'], patch_artist=True, whis=[1,99], widths=(np.full(num_pairs, 0.3)), positions=np.arange(num_pairs)+1) #positions=np.arange(len(plot_items))+1-0.15
         plt.setp(bplot1['boxes'], color='lightgreen', alpha=0.75, edgecolor='black')
         plt.setp(bplot1['medians'], color='forestgreen')
 
-        bplot2 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='snappy'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(5)+1+0.3) #positions=np.arange(len(plot_items))+1-0.15
+        bplot2 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='snappy'], patch_artist=True, whis=[1,99], widths=(np.full(num_pairs, 0.3)), positions=np.arange(num_pairs)+1+0.3) #positions=np.arange(len(plot_items))+1-0.15
         plt.setp(bplot2['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
         plt.setp(bplot2['medians'], color='indianred')
 
@@ -90,7 +91,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         # bplot1 = ax.boxplot([x[3] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1+0.15)
         # plt.setp(bplot1['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
         # plt.setp(bplot1['medians'], color='indianred')
-        plt.xticks((np.arange(len(plot_items)//3))+1, labels=[ovar_amount.val_to_ticks(x[0]) for x in plot_items[::3]])
+        plt.xticks((np.arange(num_pairs))+1, labels=[ovar_amount.val_to_ticks(x[0]) for x in plot_items[::3]])
 
 
         ax.set(xlabel=ovar_amount.axis_description+' ($\\times 10^9$)', ylabel='Execution Time [s]', title='Execution Time for {}'.format(who))

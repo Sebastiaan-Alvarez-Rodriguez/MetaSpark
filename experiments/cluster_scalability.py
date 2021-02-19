@@ -20,6 +20,7 @@ class BenchmarkClusterScalability(base.BenchmarkBase):
             # Experiment params
             self.nodes = [4, 8, 16, 32]
 
+
 class ClusterScalabilityExperiment(ExperimentInterface):
     '''Cluster scalability experiment'''
 

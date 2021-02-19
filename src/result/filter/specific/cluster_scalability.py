@@ -45,11 +45,11 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
             print('Warning: comparing different sizes')
         # Box0
         x0 = getattr(frame_arrow, ovar.name)
-        # data0 = np.add(frame_arrow.i_arr, frame_arrow.c_arr) / 10**9
+        # data0 = frame_arrow.c_arr / 10**9
         data0 = frame_arrow.c_arr / 10**9
         # Box1
         x1 = getattr(frame_spark, ovar.name)
-        # data1 = np.add(frame_spark.i_arr, frame_spark.c_arr) / 10**9
+        # data1 = frame_spark.c_arr / 10**9
         data1 = frame_spark.c_arr / 10**9
         plot_items.append((x0, data0, data1,))
 
