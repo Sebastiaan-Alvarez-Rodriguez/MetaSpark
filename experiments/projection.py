@@ -20,14 +20,18 @@ class BenchmarkProjection(base.BenchmarkBase):
         # self.flamegraph_time = '20s'
         # self.flamegraph_only_master = False
         # self.flamegraph_only_worker = False
-        self.eventlog_path = '/home/salvarez/spark-persist'
+        # self.eventlog_path = '/home/salvarez/spark-persist'
 
         # Data deployment params
         self.num_columns = 100
 
         # Experiment params
         self.amount = 30000000 # For this experiment, we generate 20x less rows, to compensate for the x25 columns
+        self.amount_multipliers = [640]
         self.compute_columns = [10, 20, 50, 100]
+        # def custom_rb_func(num_columns, compute_column, node, partitions_per_node, extension, compression, amount, amount_multiplier, kind, rb):
+        #     return (256*1024) // (compute_column*8)
+        # self.custom_rb_func = custom_rb_func
 
 
 class ProjectionExperiment(ExperimentInterface):

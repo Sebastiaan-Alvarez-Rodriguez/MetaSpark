@@ -86,7 +86,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     fig.tight_layout()
 
     if store_fig:
-          storer.store(resultdir, 'boxplot_cluster_scalability', filetype, plt)
+          storer.store(resultdir, 'boxplot_projection', filetype, plt)
 
     if large:
         plt.rcdefaults()

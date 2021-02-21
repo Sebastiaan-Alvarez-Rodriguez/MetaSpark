@@ -16,7 +16,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     plot_arr = []
     label_arr = []
     title_arr = []
-    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading, skip_leading):
+    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading,):
         # ds_arr = np.add(frame_arrow.c_arr, frame_arrow.i_arr)
         # spark_arr = np.add(frame_spark.c_arr, frame_spark.i_arr)
         arrow_arr = frame_arrow.c_arr

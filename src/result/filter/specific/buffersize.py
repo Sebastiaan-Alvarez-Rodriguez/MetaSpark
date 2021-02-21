@@ -89,7 +89,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
             plt.legend([bplot0['boxes'][0]], ['Arrow-Spark'], loc='best')
          
         ax.set_ylim(bottom=0)
-        ax2.set_ylim(bottom=0, top=1.5)
+        ax2.set_ylim(bottom=0)
         if large:
             fig.set_size_inches(16, 8)
 

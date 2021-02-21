@@ -66,7 +66,6 @@ def _add_filter_args(parser, type_opts):
     parser.add_argument('-a', '--amount', nargs='+', metavar='filter', help='Amount filters')
     parser.add_argument('-k', '--kind', nargs='+', metavar='filter', help='Kind filters')
     parser.add_argument('-rb', '--readbuffer', nargs='+', metavar='filter', help='Readbuffer filters')
-    parser.add_argument('--skip-leading', dest='skip_leading', type=int, default=3, help='Amount of starting experiment results to skip (logical to do due to cold caches), default=3')
     parser.add_argument('--type', nargs='?', metavar='type', default='generic', type=str, const='generic', help='Type: '+', '.join(type_opts))
 
 def _filterparser(subsubparsers):
@@ -88,10 +87,10 @@ def subparser(subparsers):
     specificparser = _specificparser(subsubparsers)
 
     mergeparser = subsubparsers.add_parser('merge', help='Merge continuation files into main result files')
-    mergeparser.add_argument('--skip-leading', dest='skip_leading', type=int, default=3, help='Amount of starting experiment results to skip (logical to do due to cold caches), default=3')
     
     resultparser.add_argument('data', help='Location of data', type=str)
     resultparser.add_argument('-l', '--large', help='Forces to generate large graphs, with large text', action='store_true')
+    resultparser.add_argument('-sl', '--skip-leading', dest='skip_leading', type=int, default=1, metavar='number', help='Amount of starting experiment results to skip (logical to do due to cold caches), default=1')
     resultparser.add_argument('-ns', '--no-show', dest='no_show', help='Do not show generated graph (useful on servers without xorg forwarding)', action='store_true')
     resultparser.add_argument('-s', '--store', help='Store generated graph (in {}/<resultdirname>/<graph_name>.<type>)'.format(loc.get_metaspark_graphs_dir()), action='store_true')
     resultparser.add_argument('-t', '--storetype', help='Preferred storage type (default=pdf)', default=['pdf'], type=str)
@@ -169,6 +168,7 @@ def results(parsers, args):
             printe('Unreconised provided type "{}"'.format(args.type))
             specificparser.print_help()
             return
+        assert args.skip_leading == 1
         plotter.stats(args.data, *(fdata+fargs+[args.skip_leading]))
     elif args.subcommand == 'merge':
         merge(args.data, args.skip_initial)

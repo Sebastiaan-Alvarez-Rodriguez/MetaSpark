@@ -54,6 +54,7 @@ class BenchmarkBase(object):
         self.kinds = ['df']
         self.rbs = [8192]
         self.test_modes = ['--arrow-only', '--spark-only']
+        self.custom_rb_func = None #Function to override rbs for experiments with variable amounts of input data
 
         self.runs = 31 # We run our selfementation and the Spark baseline selfementation X times
         self.retries = 2 # If our application dies X times, we stop trying and move on
@@ -61,7 +62,7 @@ class BenchmarkBase(object):
         self.appl_dead_after_tries = 20 # If results have not changed between X block checks, we think the application has died
 
 
-    def distribute_data(self, metadeploy, reservation, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node):
+    def distribute_data(self, metadeploy, reservation, node, extension, compression, amount_multiplier, partitions_per_node):
         # Generate data to /local/<name>/num_columns, jarfile adds /amount/partitions/(rnd)extension_<compression>/
         if self.dataset_name:
             deploypath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), self.dataset_name, self.num_columns)
@@ -118,7 +119,10 @@ class BenchmarkBase(object):
         # and try to do that many runs in the next iteration.
         status = True
 
-        deploypath = self.distribute_data(metadeploy, reservation, node, extension, compression, amount_multiplier, kind, rb, partitions_per_node)
+        if self.custom_rb_func != None:
+            rb = self.custom_rb_func(self.num_columns, compute_column, node, partitions_per_node, extension, compression, self.amount, amount_multiplier, kind, rb)
+
+        deploypath = self.distribute_data(metadeploy, reservation, node, extension, compression, amount_multiplier, partitions_per_node)
 
         for extra_arg in self.test_modes:
             # <num_cols>/<compute_cols>/<node>/<partitions_per_node>/<extension>/<compression>/<amount>/<kind>/<rb>/

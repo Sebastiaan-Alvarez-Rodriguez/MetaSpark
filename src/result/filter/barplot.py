@@ -32,7 +32,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     fig, ax = plt.subplots()
 
     plot_items = []
-    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading, skip_leading):
+    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading,):
         # BAR1loc
         i0 = frame_arrow.i_avgtime
         c0 = frame_arrow.c_avgtime

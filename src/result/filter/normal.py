@@ -14,7 +14,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
 
     # print('When looking at the 32, pq, 10000, 20480*8 category:')
     reader = Reader(path)
-    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading, skip_leading):
+    for frame_arrow, frame_spark in reader.read_ops(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, skip_leading,):
         if large:
             fontsize = 28
             font = {

@@ -64,7 +64,10 @@ class Reader(object):
                     identifiers_a = self._path_to_identifiers(file_a)
                     identifiers_b = self._path_to_identifiers(file_b)
                     if identifiers_a != identifiers_b:
-                        raise RuntimeError('Error: Found that identifiers are not equivalent of files in same directory')
+                        msg = 'Error: Found that identifiers are not equivalent for 2 files in same directory:\n{}\n{}'.format(file_a, file_b)
+                        if not identifiers_b.endswith('_s'):
+                            msg += '\nNote: There seems to be a missing ".res_s" file missing for the top file. Fixable by making an empty file.'
+                        raise RuntimeError(msg)
                     with open(file_a, 'r') as f_a:
                         frame_a = Frame(*identifiers_a, 'arrow', f_a.readlines(), skip_leading)
                     with open(file_b, 'r') as f_b:

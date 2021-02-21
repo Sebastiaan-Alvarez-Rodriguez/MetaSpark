@@ -17,7 +17,10 @@ def deploy_meta(experiment_names):
     else:
         experiments = []
         for name in experiment_names:
-            experiments.append(exp.load_experiment(name))
+            found = exp.load_experiment(name)
+            if found == None:
+                return False
+            experiments.append(found)
 
     def run_experiment(idx, amount, experiment):
         print('Starting experiment {}/{}'.format(idx+1, amount))
