@@ -1,3 +1,4 @@
+from enum import Enum
 import time
 
 import experiments.util as eu
@@ -6,7 +7,12 @@ import util.fs as fs
 import util.location as loc
 from util.printer import *
 
+class DeployTechnique(Enum):
+    '''The technique to use for deployment'''
+    REGULAR = 0  # Just straightforward deployment.
+    TRIANGLE = 1 # Generate data on each node locally, in /local. Then copy to destination.
 
+        
 class BenchmarkBase(object):
     def __init__(self):
         # Cluster spawning params
@@ -20,8 +26,9 @@ class BenchmarkBase(object):
         self.data_jar = 'arrow-spark-benchmark-1.0-all.jar'
         self.random_data = False
         self.data_args = '-np {} -p {}/ --format {} -nr {} -cl {} -nc {}'
-        self.data_deploy_mode = DeployMode.RAM # Must remain on RAM deploy mode for this experiment
-        self.first_time_force = False # Force to generate the data, even if the directory exists, when we launch a cluster for the first time
+        self.data_deploy_mode = DeployMode.RAM # Must remain on RAM deploy mode for this experiment.
+        self.data_deploy_technique = DeployTechnique.TRIANGLE # We Generate data on clusters locally, to keep a backup of the data.
+        self.first_time_force = False # Force to generate the data, even if the directory exists, when we launch a cluster for the first time.
         self.dataset_name = None
         self.num_columns = 4
 
@@ -63,11 +70,11 @@ class BenchmarkBase(object):
 
 
     def distribute_data(self, metadeploy, reservation, node, extension, compression, amount_multiplier, partitions_per_node):
-        # Generate data to /local/<name>/num_columns, jarfile adds /amount/partitions/(rnd)extension_<compression>/
-        if self.dataset_name:
-            deploypath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), self.dataset_name, self.num_columns)
-        else:
-            deploypath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), self.num_columns)
+        if self.data_deploy_technique == DeployTechnique.TRIANGLE and not self.data_deploy_mode == DeployMode.RAM:
+            raise RuntimeError('TRIANGLE deployment technique only makes sense when deploying to volatile storage (e.g. RAM)')
+        startpoint = loc.get_node_data_dir(DeployMode.RAM) if self.data_deploy_technique == DeployTechnique.TRIANGLE else loc.get_node_data_dir(self.data_deploy_mode)    
+        ds_name = self.dataset_name if self.dataset_name else ''
+        deploypath = fs.join(loc.get_node_data_dir(DeployMode.LOCAL), ds_name, self.num_columns)
 
         data_runargs = self.data_args.format(node*partitions_per_node, deploypath, extension, self.amount, compression, self.num_columns)
         extension_filepath = extension
@@ -78,12 +85,12 @@ class BenchmarkBase(object):
             extension_filepath = 'rnd'+extension_filepath
         if extension == 'pq' and compression != 'uncompressed':
             extension_filepath = '{}_{}'.format(extension_filepath, compression)
-
         generate_cmd = '$JAVA_HOME/bin/java -jar ~/{} {} > /dev/null 2>&1'.format(self.data_jar, data_runargs)
-        if not eu.deploy_data_fast(metadeploy, reservation, generate_cmd, self.dataset_name, node, partitions_per_node, extension, self.amount, amount_multiplier, self.num_columns, extension_filepath):
-            raise RuntimeError('Data deployment failure')
-        return fs.join(loc.get_node_data_dir(DeployMode.RAM), self.dataset_name, self.num_columns) if self.dataset_name else fs.join(loc.get_node_data_dir(DeployMode.RAM), self.num_columns)
-        
+        if self.data_deploy_technique == DeployTechnique.TRIANGLE:
+            return eu.deploy_data_triangle(metadeploy, reservation, generate_cmd, ds_name, node, partitions_per_node, extension, self.amount, amount_multiplier, self.num_columns, extension_filepath)
+        else:
+            return eu.deploy_data_regular(metadeploy, reservation, generate_cmd, ds_name, node, partitions_per_node, extension, self.amount, amount_multiplier, self.num_columns, extension_filepath, self.data_deploy_mode)
+
 
     def finalize_submitopts(self, experiment_outputloc, experiment_rb):
         shared_base_opts = '-Dfile={} -Dio.netty.allocator.directMemoryCacheAlignment=64'.format(experiment_outputloc) # -XX:+FlightRecorder

@@ -60,17 +60,17 @@ def get_spark_conf_dir():
 def get_spark_logs_dir():
     return fs.join(get_spark_dir(), 'logs')
 
-def get_spark_work_dir(deploy_mode):
-    if deploy_mode == DeployMode.STANDARD:
+def get_spark_work_dir(deploymode):
+    if deploymode == DeployMode.STANDARD:
         return fs.join(get_spark_dir(), 'work')
-    elif deploy_mode == DeployMode.LOCAL:
+    elif deploymode == DeployMode.LOCAL:
         return fs.join(get_node_local_dir(), 'work')
-    elif deploy_mode == DeployMode.LOCAL_SSD:
+    elif deploymode == DeployMode.LOCAL_SSD:
         return fs.join(get_node_local_ssd_dir(), 'work')
-    elif deploy_mode == DeployMode.RAM:
+    elif deploymode == DeployMode.RAM:
         return fs.join(get_node_ram_dir(), 'work')
     else:
-        raise RuntimeError('Could not find a workdir destination for deploymode: {}'.format(deploy_mode))
+        raise RuntimeError('Could not find a workdir destination for deploymode: {}'.format(deploymode))
 
 #################### Remote directories ####################
 def get_remote_metaspark_parent_dir(sshconfig=None):
@@ -92,28 +92,38 @@ def get_remote_metaspark_logs_dir(sshconfig=None):
     return fs.join(get_remote_metaspark_dir(sshconfig), 'logs')
 
 #################### Node directories ####################
-# Because we will use client logging using plan 2, this should change
+
 def get_node_local_dir():
     return '/local/{}/'.format(metacfg.ssh.ssh_user_name)
 
-# Faster dir than /local/. This is a local dir mapped on an SSD!
-# Note: Not all machines have this directory. Others have it but deny permission,
-# because the particular node has no SSD.
-# Need a special allocation command to get only nodes with SSD disks.
 def get_node_local_ssd_dir():
     return '/local-ssd/{}/'.format(metacfg.ssh.ssh_user_name)
 
 def get_node_ram_dir():
     return '/dev/shm/{}/'.format(metacfg.ssh.ssh_user_name)
 
-def get_node_data_dir(deploy_mode):
-    if deploy_mode == DeployMode.STANDARD:
+
+# Returns path containing links to the dataset for each deploymode
+def get_node_data_link_dir(deploymode):
+    if deploymode == DeployMode.STANDARD:
+        return fs.dirname(get_metaspark_data_dir(), 'data_link')
+    elif deploymode == DeployMode.LOCAL:
+        return fs.join(get_node_local_dir(), 'data_link')
+    elif deploymode == DeployMode.LOCAL_SSD:
+        return fs.join(get_node_local_ssd_dir(), 'data_link')
+    else:
+        raise RuntimeError('Could not find a data-linkdir destination for deploymode: {}'.format(deploymode))
+
+
+# Directory path containing the datasets for each deploymode
+def get_node_data_dir(deploymode):
+    if deploymode == DeployMode.STANDARD:
         return get_metaspark_data_dir()
-    elif deploy_mode == DeployMode.LOCAL:
+    elif deploymode == DeployMode.LOCAL:
         return fs.join(get_node_local_dir(), 'data')
-    elif deploy_mode == DeployMode.LOCAL_SSD:
+    elif deploymode == DeployMode.LOCAL_SSD:
         return fs.join(get_node_local_ssd_dir(), 'data')
-    elif deploy_mode == DeployMode.RAM:
+    elif deploymode == DeployMode.RAM:
         return fs.join(get_node_ram_dir(), 'data')
     else:
-        raise RuntimeError('Could not find a datadir destination for deploymode: {}'.format(deploy_mode))
+        raise RuntimeError('Could not find a datadir destination for deploymode: {}'.format(deploymode))

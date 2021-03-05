@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import numpy as np
 
 from result.util.dimension import Dimension
@@ -9,6 +10,9 @@ import util.location as loc
 
 # Plots execution time with variance (percentiles) as a boxplot, using provided filters
 def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_leading):
+    colormap = cm.get_cmap('winter', 5)
+    colors = [colormap(2), colormap(0), 'red']
+
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
     num_ovars = Dimension.num_open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb)
@@ -46,11 +50,11 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         if len(frame_arrow) != len(frame_spark):
             print('Warning: comparing different sizes')
         # Box0
-        amount0 = getattr(frame_arrow, ovar_amount.name) / 10**9
+        amount0 = getattr(frame_arrow, ovar_amount.name)
         comp0 = getattr(frame_arrow, ovar_compression.name)
         data0 = frame_arrow.c_arr / 10**9
         # Box1
-        amount1 = getattr(frame_spark, ovar_amount.name) / 10**9
+        amount1 = getattr(frame_spark, ovar_amount.name)
         comp1 = getattr(frame_arrow, ovar_compression.name)
         data1 = frame_spark.c_arr / 10**9
         if amount0 != amount1:
@@ -73,30 +77,19 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
         num_pairs = len(plot_items) // 3
         plot_items_arranged = ((plot_items[x*3], plot_items[x*3+1], plot_items[x*3+2]) for x in range(len(plot_items)//3))
 
-        # Plot the left boxes, the uncompressed ones
-        bplot0 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='uncompressed'], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items)//3, 0.3)), positions=np.arange(num_pairs)+1-0.3) #positions=np.arange(len(plot_items))+1-0.15
-        plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
-        plt.setp(bplot0['medians'], color='midnightblue')
+        width = 0.10
+        indices = np.arange(num_pairs)+1
+        compressions = ['uncompressed', 'gzip', 'snappy']
+        colors = [colors[0], colors[1], colors[2]]
+        bplots= []
+        for idx2, (color, dataset) in enumerate(zip(colors, ([x[2+idx] for x in plot_items if x[1]==token] for token in compressions))):
+            err0 = ([(np.median(x)-np.percentile(x, 1)) for x in dataset], [abs(np.median(x)-np.percentile(x, 99)) for x in dataset])
+            bplots.append(ax.bar(indices+0.10*(idx2-1), [np.median(x) for x in dataset], width, yerr=err0, capsize=6, label=who, color=color, alpha=0.75, edgecolor='black'))
 
-        # Plot the middle boxes, the gzip ones
-        bplot1 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='gzip'], patch_artist=True, whis=[1,99], widths=(np.full(num_pairs, 0.3)), positions=np.arange(num_pairs)+1) #positions=np.arange(len(plot_items))+1-0.15
-        plt.setp(bplot1['boxes'], color='lightgreen', alpha=0.75, edgecolor='black')
-        plt.setp(bplot1['medians'], color='forestgreen')
+        plt.xticks(indices, labels=['{:.1f}'.format(x[0]*4*8/1024/1024/1024) for x in plot_items[::3]])
+        ax.set(xlabel=ovar_amount.axis_description+' [GB]', ylabel='Execution Time [s]') #title='Execution Time for {}'.format(who)
 
-        bplot2 = ax.boxplot([x[2+idx] for x in plot_items if x[1]=='snappy'], patch_artist=True, whis=[1,99], widths=(np.full(num_pairs, 0.3)), positions=np.arange(num_pairs)+1+0.3) #positions=np.arange(len(plot_items))+1-0.15
-        plt.setp(bplot2['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
-        plt.setp(bplot2['medians'], color='indianred')
-
-        # Plot Spark stuff:
-        # bplot1 = ax.boxplot([x[3] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1+0.15)
-        # plt.setp(bplot1['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
-        # plt.setp(bplot1['medians'], color='indianred')
-        plt.xticks((np.arange(num_pairs))+1, labels=[ovar_amount.val_to_ticks(x[0]) for x in plot_items[::3]])
-
-
-        ax.set(xlabel=ovar_amount.axis_description+' ($\\times 10^9$)', ylabel='Execution Time [s]', title='Execution Time for {}'.format(who))
-
-        plt.legend([bplot0['boxes'][0], bplot1['boxes'][0], bplot2['boxes'][0]], ['uncompressed', 'gzip', 'snappy'], loc='best')
+        plt.legend([x[0] for x in bplots], compressions, loc='best', ncol=3)
 
         ax.set_ylim(bottom=0)
 

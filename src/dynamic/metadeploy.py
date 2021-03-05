@@ -140,33 +140,24 @@ class MetaDeploy(object):
     def clean_junk(self, reservation, deploy_mode=None, fast=False, datadir=None):
         if deploy_mode == None: # We don't know where to clean. Clean everywhere
             workdirs = ' '.join([loc.get_spark_work_dir(val) for val in DeployMode])
-            fast = False # we don't know the node numbers!
         else:
             object_deploymode = DeployMode.interpret(deploy_mode) if isinstance(deploy_mode, str) else deploy_mode
             workdirs = loc.get_spark_work_dir(object_deploymode)
 
-        if fast:
-            nfs_log = loc.get_spark_logs_dir()
-            command = 'rm -rf {} {}'.format(workdirs, nfs_log)
-            return os.system(command) == 0
-        else:
-            executors = []
-            nfs_log = loc.get_spark_logs_dir()
-            log_command = 'rm -rf {}'.format(nfs_log)
-            executors.append(Executor(log_command, shell=True))
+        state = True
+        if not fast:
             datadir = '' if datadir == None else datadir
-
-            for x in reservation.deployment.nodes:
-                clean_command = 'ssh {} "rm -rf {} {} {}"'.format(x, workdirs, nfs_log, datadir)
-
-                executors.append(Executor(clean_command, shell=True))
-            Executor.run_all(executors)
-            state = Executor.wait_all(executors, stop_on_error=False)
-            if state:
-                prints('Clean success!')
-            else:
-                printe('Clean failure!')
-            return state
+            clean_command = 'rm -rf {} {}'.format(workdirs, datadir)
+            state &= self.deploy_nonspark_application(reservation, clean_command)
+        nfs_log = loc.get_spark_logs_dir()
+        command = 'rm -rf {} {}'.format(workdirs, nfs_log)
+        state &= os.system(command) == 0
+        if state:
+            prints('Clean success!')
+        else:
+            printe('Clean failure!')
+        return state
+            
 
     '''
     Deploy an application. We require the following parameters:

@@ -25,7 +25,7 @@ def check_active(silent):
 def subparser(subsubparsers):
     utilparser = subsubparsers.add_parser('util', help='Deploy utilities')
     utilparsers = utilparser.add_subparsers(help='Subsubcommands', dest='subcommand')
-    
+
     nodesusedparser = utilparsers.add_parser('nodes_used', help='Returns number of used nodes on this machine (as program exit code)')
     nodesusedparser.add_argument('-s', '--silent', help='If set, does not print anything', action='store_true')
 

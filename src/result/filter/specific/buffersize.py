@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import numpy as np
 
 from result.util.dimension import Dimension
@@ -9,6 +10,9 @@ import util.location as loc
 
 # Plots execution time with variance (percentiles) as a boxplot, using provided filters
 def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_leading):
+    colormap = cm.get_cmap('winter', 5)
+    colors = [colormap(2), colormap(0), 'red']
+
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
     if Dimension.num_open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb) > 1:
@@ -59,34 +63,38 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     for idx in range(2):
         fig, ax = plt.subplots()
 
-        bplot0 = ax.boxplot([x[1] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1-0.15)
-        plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
-        plt.setp(bplot0['medians'], color='midnightblue')
+        width = 0.3
+        indices = np.arange(len(plot_items))+1
+        bplot0 = ax.boxplot([x[1] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), width)), positions=indices-width/2)
+        plt.setp(bplot0['boxes'], color=colors[0], alpha=0.75, edgecolor='black')
+        plt.setp(bplot0['medians'], color='black')
 
         if idx == 0:
-            bplot1 = ax.boxplot([x[2] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1+0.15)
-            plt.setp(bplot1['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
-            plt.setp(bplot1['medians'], color='indianred')
+            bplot1 = ax.boxplot([x[2] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), width)), positions=indices+width/2)
+            plt.setp(bplot1['boxes'], color=colors[1], alpha=0.75, edgecolor='black')
+            plt.setp(bplot1['medians'], color='black')
+            plt.text(1, 300, 'Arrow-Spark')
+            plt.arrow(2, 300, 1-2, max(plot_items[0][1])+10 - 300)
+            plt.arrow(2, 300, 2-width/2-2, max(plot_items[1][1])+10 - 300)
+            plt.arrow(2, 300, 3-width/1.3-2, max(plot_items[2][1])+10 - 300)
 
         import math
-        ticks = ['$2^{'+str(int(math.log(x[0], 2)))+'}$' for x in plot_items]
-        # ticks = [ovar.val_to_ticks(x[0]) for x in plot_items]
-        plt.xticks(np.arange(len(plot_items))+1, labels=ticks)
+        ticks = ['$2^{'+str(int(math.log(x[0]*4*8//1024, 2)))+'}$' for x in plot_items]
+        plt.xticks(indices, labels=ticks)
 
-
-        ax.set(xlabel=ovar.axis_description, ylabel='Execution Time [s]')
+        ax.set(xlabel=ovar.axis_description+' [KB]', ylabel='Execution Time [s]')
         # add a twin axes and set its limits so it matches the first
         ax2 = ax.twinx()
         # ax2.set_ylim((0.9, 3.5))
         ax2.set_ylabel('Relative speedup of Arrow-Spark')
-        ax2.tick_params(axis='y', colors='steelblue')
-        ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark', marker='D', markersize=10, color='steelblue')
+        ax2.tick_params(axis='y', colors=colors[2])
+        ax2.plot(indices, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark', marker='D', markersize=10, markeredgecolor='black', markeredgewidth='1.5', color=colors[2])
         plt.grid()
 
         if idx == 0:
-            plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best')
+            plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='best', ncol=2)
         else:
-            plt.legend([bplot0['boxes'][0]], ['Arrow-Spark'], loc='best')
+            plt.legend([bplot0['boxes'][0]], ['Arrow-Spark'], loc='best', ncol=2)
          
         ax.set_ylim(bottom=0)
         ax2.set_ylim(bottom=0)
@@ -95,8 +103,9 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
 
         fig.tight_layout()
 
-        if store_fig:
-              storer.store(resultdir, 'boxplot_buffersize', filetype, plt)
+        if idx == 0:
+            if store_fig:
+                  storer.store(resultdir, 'boxplot_buffersize', filetype, plt)
 
         if not no_show:
             plt.show()

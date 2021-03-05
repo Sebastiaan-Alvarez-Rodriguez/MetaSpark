@@ -27,8 +27,11 @@ class BenchmarkProjection(base.BenchmarkBase):
 
         # Experiment params
         self.amount = 30000000 # For this experiment, we generate 20x less rows, to compensate for the x25 columns
-        self.amount_multipliers = [640]
-        self.compute_columns = [10, 20, 50, 100]
+        self.amount_multipliers = [32]
+        self.compute_columns = [100, 50, 20, 10]
+        self.rbs = [32768]
+        self.test_modes = ['--spark-only','--arrow-only']
+        
         # def custom_rb_func(num_columns, compute_column, node, partitions_per_node, extension, compression, amount, amount_multiplier, kind, rb):
         #     return (256*1024) // (compute_column*8)
         # self.custom_rb_func = custom_rb_func

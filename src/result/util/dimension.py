@@ -73,11 +73,11 @@ class Dimension(object):
         if name == 'compression':
             return 'Used compression format'
         if name == 'amount':
-            return 'data read [rows]'
+            return 'Dataset size'
         if name == 'kind':
             return 'Spark data representation type'
         if name == 'rb':
-            return 'Batch size [rows]'
+            return 'Batch size'
         raise RuntimeError('Could not get axis axis_description for "{}"'.format(name))
 
 

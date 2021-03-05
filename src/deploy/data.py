@@ -92,7 +92,10 @@ def deploy_data_multiplier(multiplier, directory, extension):
         source = fs.join(directory, '{}.{}'.format(x, extension))
         for y in range(multiplier-1):
             dest = fs.join(directory, '{}_{}.{}'.format(x, y, extension))
-            fs.ln(source, dest, soft=False, is_dir=False)
+            try:
+                fs.ln(source, dest, soft=False, is_dir=False)
+            except FileExistsError as e:
+                continue # Ignore when symlink already exists
     return True
 
 

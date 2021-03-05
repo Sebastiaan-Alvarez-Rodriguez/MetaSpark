@@ -65,10 +65,7 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
 
     plt.xticks(ind, xticks0)
     ax.set(xlabel=ovar.axis_description, ylabel='Average Execution Time (s)', title='Execution Time Composition')
-        
-    # ax[1].plot(list(range(10)), list(range(10)), label='Spark')
 
-    # ax[0].set(xlabel='Time (s)', ylabel='Probability density', title='Total execution time for Arrow-Spark')
     if large:
         plt.legend(loc='best', fontsize=18, frameon=False)
     else:

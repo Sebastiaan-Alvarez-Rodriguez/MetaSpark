@@ -1,4 +1,5 @@
 import matplotlib.pyplot as plt
+from matplotlib import cm
 import numpy as np
 
 from result.util.dimension import Dimension
@@ -9,6 +10,9 @@ import util.location as loc
 
 # Plots execution time with variance (percentiles) as a boxplot, using provided filters
 def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb, large, no_show, store_fig, filetype, skip_leading):
+    colormap = cm.get_cmap('winter', 5)
+    colors = [colormap(2), colormap(0), 'red']
+
     path = fs.join(loc.get_metaspark_results_dir(), resultdir)
 
     if Dimension.num_open_vars(num_cols, compute_cols, node, partitions_per_node, extension, compression, amount, kind, rb) > 1:
@@ -58,12 +62,12 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     plot_items.sort(key=lambda item: item[0]) # Will sort on x0. x0==x1==ovar, the open variable
 
     bplot0 = ax.boxplot([x[1] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1-0.15)
-    plt.setp(bplot0['boxes'], color='steelblue', alpha=0.75, edgecolor='black')
-    plt.setp(bplot0['medians'], color='midnightblue')
+    plt.setp(bplot0['boxes'], color=colors[0], alpha=0.75, edgecolor='black')
+    plt.setp(bplot0['medians'], color='black')
 
     bplot1 = ax.boxplot([x[2] for x in plot_items], patch_artist=True, whis=[1,99], widths=(np.full(len(plot_items), 0.3)), positions=np.arange(len(plot_items))+1+0.15)
-    plt.setp(bplot1['boxes'], color='lightcoral', alpha=0.75, edgecolor='black')
-    plt.setp(bplot1['medians'], color='indianred')
+    plt.setp(bplot1['boxes'], color=colors[1], alpha=0.75, edgecolor='black')
+    plt.setp(bplot1['medians'], color='black')
     plt.xticks(np.arange(len(plot_items))+1, labels=[ovar.val_to_ticks(x[0]) for x in plot_items])
 
     ax.set(xlabel=ovar.axis_description, ylabel='Execution Time [s]', title='Execution Time for Arrow-Spark')
@@ -72,11 +76,11 @@ def stats(resultdir, num_cols, compute_cols, node, partitions_per_node, extensio
     ax2 = ax.twinx()
     # ax2.set_ylim((0.65, 1.00))
     ax2.set_ylabel('Relative speedup of Arrow-Spark')
-    ax2.tick_params(axis='y', colors='steelblue')
-    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark', linestyle='', marker='D', markersize=10, color='steelblue')
+    ax2.tick_params(axis='y', colors=colors[2])
+    ax2.plot(np.arange(len(plot_items))+1, [np.median(x[2])/np.median(x[1]) for x in plot_items], label='Relative speedup of Arrow-Spark', linestyle='', marker='D', markersize=10, markeredgecolor='black', markeredgewidth='1.5', color=colors[2])
     plt.grid()
 
-    plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='upper left')
+    plt.legend([bplot0['boxes'][0], bplot1['boxes'][0]], ['Arrow-Spark', 'Spark'], loc='upper left', ncol=2)
 
     ax.set_ylim(bottom=0)
     ax2.set_ylim(bottom=0, top=1.7)
